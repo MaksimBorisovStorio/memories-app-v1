@@ -41,6 +41,97 @@
       background: var(--bg);
     }
 
+    /* ── START SCREEN — how to install to the home screen ──────
+       Sits above every screen until dismissed, and skips itself when the
+       prototype is already running standalone from the home screen. */
+    .start-screen {
+      position: absolute; inset: 0; z-index: 100;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      padding: max(24px, env(safe-area-inset-top)) 24px max(16px, env(safe-area-inset-bottom));
+      transition: opacity 0.28s ease, visibility 0.28s ease;
+    }
+    .start-screen.dismissed { opacity: 0; visibility: hidden; }
+    .start-logo-row { display: flex; justify-content: center; padding: 8px 0 28px; flex-shrink: 0; }
+    .start-body { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 24px; }
+    .start-title {
+      font-size: 28px; font-weight: 700;
+      line-height: 34px; letter-spacing: -0.5px;
+      color: var(--text);
+    }
+    .start-lede {
+      font-size: 16px; font-weight: 400;
+      line-height: 23px; letter-spacing: -0.2px;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+    .start-steps { list-style: none; display: flex; flex-direction: column; gap: 18px; }
+    .start-step { display: flex; align-items: flex-start; gap: 14px; }
+    .start-step-num {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 15px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .start-step-text {
+      font-size: 16px; font-weight: 400;
+      line-height: 24px; letter-spacing: -0.2px;
+      color: var(--text);
+      padding-top: 2px;
+    }
+    .start-step-text strong { font-weight: 600; }
+    /* Small inline glyph so the wording matches what's on screen in iOS */
+    .start-icon {
+      width: 19px; height: 19px;
+      vertical-align: -4px;
+      margin: 0 1px;
+      color: var(--accent);
+    }
+    /* "Copy link" — for when the page was opened inside an in-app browser
+       (Slack, Mail, LinkedIn…) where Add to Home Screen isn't offered. */
+    .start-copy {
+      display: inline-flex; align-items: center; gap: 7px;
+      margin-top: 10px;
+      padding: 8px 14px;
+      border-radius: 100px;
+      border: 1.5px solid var(--accent);
+      background: var(--bg);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: 14px; font-weight: 600; letter-spacing: -0.1px;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+    .start-copy svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .start-copy .start-copy-done { display: none; }
+    .start-copy.copied {
+      background: var(--accent);
+      color: #ffffff;
+    }
+    .start-copy.copied .start-copy-idle { display: none; }
+    .start-copy.copied .start-copy-done { display: inline; }
+
+    .start-note {
+      font-size: 14px; font-weight: 400;
+      line-height: 21px; color: var(--text-muted);
+      padding: 16px; border-radius: 14px;
+      background: var(--bg-grey);
+    }
+    .start-cta { flex-shrink: 0; padding-top: 20px; }
+    .start-btn {
+      width: 100%; height: 52px;
+      background: var(--accent);
+      border: none; border-radius: 26px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 17px; font-weight: 600; letter-spacing: -0.2px;
+      cursor: pointer;
+    }
+    .start-btn:active { background: var(--accent-mid); }
+
     /* ── SCREEN SYSTEM ── */
     .screen {
       position: absolute; inset: 0;
@@ -1547,6 +1638,48 @@
     </div>
   </div>
 
+
+  <!-- ═══════════════════ START SCREEN ═══════════════════ -->
+  <div class="start-screen" id="startScreen">
+
+    <div class="start-logo-row"><svg class="start-logo" width="118" height="22" viewBox="0 0 118.222 21.606" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Photobox">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M34.8341 2.64998C34.7121 2.01081 34.6061 1.45561 34.6061 1.14361C34.6061 0.204217 35.318 0 35.5949 0C36.5441 0 36.7814 1.10277 36.7814 1.67458C36.7814 2.01185 36.7334 2.1882 36.6903 2.34674C36.6551 2.47619 36.6232 2.59376 36.6232 2.77734C36.6232 3.58485 36.4784 4.47543 36.3735 5.12061L36.3735 5.12067C36.3139 5.48708 36.2672 5.77434 36.2672 5.92228C36.2672 6.33071 36.0695 6.57577 35.7531 6.57577C35.3719 6.57577 35.2969 5.8907 35.2001 5.00731L35.2001 5.00694L35.2 5.00587L35.1999 5.0054L35.1998 5.00426C35.1762 4.78871 35.1513 4.5614 35.1203 4.32939C35.0484 3.77266 34.9357 3.18221 34.8341 2.64998ZM60.8277 11.4362C60.8277 14.9487 63.438 17.8486 66.8788 17.8486C70.3196 17.8486 72.9299 14.9079 72.9299 11.4362C72.9299 7.96451 70.2801 5.06463 66.8788 5.06463C63.4775 5.06463 60.8277 7.96451 60.8277 11.4362ZM5.65563 12.6206H1.93794V16.7458C1.93794 17.3176 1.50289 17.7261 0.949197 17.7261C0.395499 17.7261 0 17.2768 0 16.7458V6.12655C0 5.55474 0.435048 5.14631 0.949197 5.14631H5.65563C8.46367 5.14631 9.76882 6.94342 9.76882 8.9039C9.76882 10.8644 8.46367 12.6206 5.65563 12.6206ZM5.93244 6.98423H1.97745V10.7827H5.93244C7.19803 10.7827 7.83083 9.88411 7.83083 8.90387C7.83083 7.92363 7.19803 6.98423 5.93244 6.98423ZM22.1874 16.7867C22.1874 17.3176 22.5829 17.7669 23.1366 17.7669C23.6903 17.7669 24.0858 17.3176 24.0858 16.7458V6.12655C24.0858 5.59559 23.6903 5.14631 23.1366 5.14631C22.6225 5.14631 22.1874 5.55474 22.1874 6.12655V10.3743H16.2154V6.12655C16.2154 5.59559 15.8199 5.14631 15.2662 5.14631C14.752 5.14631 14.317 5.55474 14.317 6.12655V16.7458C14.317 17.2768 14.7125 17.726 15.2662 17.726C15.8199 17.726 16.2154 17.3176 16.2154 16.7458V12.2122H22.1874V16.7867ZM57.1891 7.0251H53.6692V16.7458C53.6692 17.3176 53.2341 17.7669 52.6804 17.7669C52.1267 17.7669 51.7312 17.3176 51.7312 16.7458V7.0251H48.2113C47.6971 7.0251 47.3016 6.61667 47.3016 6.08571C47.3016 5.55474 47.6971 5.14631 48.2113 5.14631H57.1891C57.7033 5.14631 58.0988 5.55474 58.0988 6.08571C58.0988 6.61667 57.7033 7.0251 57.1891 7.0251ZM66.8787 6.90256C64.3871 6.90256 62.726 9.02641 62.726 11.477C62.726 13.9276 64.3871 16.0515 66.8787 16.0515C69.3704 16.0515 71.0315 13.9276 71.0315 11.477C71.0315 9.02641 69.3704 6.90256 66.8787 6.90256ZM78.8229 17.7669H83.3711C85.9814 17.7669 87.5238 16.2148 87.4843 14.2544C87.4843 12.784 86.6537 11.4362 85.3091 11.0277C86.2582 10.5376 86.7724 9.4757 86.7724 8.2504C86.7724 6.41245 85.3882 5.14631 83.0547 5.14631H78.8229C78.2692 5.14631 77.8341 5.59559 77.8341 6.16739V16.7458C77.8341 17.3176 78.2692 17.7669 78.8229 17.7669ZM83.2129 7.0249H79.8511V10.2107H83.2129C84.2807 10.2107 84.8344 9.4755 84.8344 8.61779C84.8344 7.71924 84.2412 7.0249 83.2129 7.0249ZM79.8511 12.0079H83.6479C84.9135 12.0079 85.5463 12.9881 85.5858 13.9683C85.5858 14.9077 84.9135 15.888 83.6479 15.888H79.8511V12.0079ZM97.965 17.8486C94.5241 17.8486 91.9139 14.9487 91.9139 11.4362C91.9139 7.96451 94.5637 5.06463 97.965 5.06463C101.406 5.06463 104.016 7.96451 104.016 11.4362C104.016 14.9079 101.406 17.8486 97.965 17.8486ZM93.8123 11.477C93.8123 9.02641 95.4734 6.90256 97.965 6.90256C100.457 6.90256 102.118 9.02641 102.118 11.477C102.118 13.9276 100.457 16.0515 97.965 16.0515C95.4734 16.0515 93.8123 13.9276 93.8123 11.477ZM117.938 17.6035C117.78 17.7261 117.582 17.8077 117.384 17.8077C117.107 17.8077 116.83 17.6852 116.633 17.4402L113.35 12.9474L110.067 17.4402C109.909 17.6444 109.632 17.8077 109.355 17.8077C109.158 17.8077 108.96 17.7261 108.802 17.6035C108.604 17.4402 108.485 17.1951 108.485 16.9092C108.485 16.705 108.525 16.5008 108.683 16.3374L112.243 11.477L108.683 6.61667C108.564 6.4533 108.485 6.24908 108.485 6.04486C108.485 5.71812 108.644 5.47306 108.881 5.30968C109.039 5.228 109.197 5.14631 109.355 5.14631C109.632 5.14631 109.909 5.26884 110.067 5.5139L113.31 9.96582L116.593 5.5139C116.751 5.30968 116.989 5.14631 117.265 5.14631C117.463 5.14631 117.661 5.228 117.819 5.35053C118.017 5.5139 118.175 5.7998 118.175 6.08571C118.175 6.28992 118.096 6.49414 117.977 6.61667L114.418 11.4362L118.017 16.2965C118.136 16.4599 118.215 16.705 118.215 16.8683C118.254 17.1542 118.136 17.3993 117.938 17.6035ZM39.0753 9.10808C39.846 9.10808 41.0274 8.14908 41.8636 7.47034L41.8636 7.47032L41.8637 7.47027C42.2719 7.13896 42.5977 6.87444 42.7534 6.82085C42.7746 6.81209 42.7972 6.80332 42.821 6.7941C43.0186 6.7174 43.2973 6.60926 43.5444 6.2082C43.7562 5.80715 44.0311 5.73156 44.2846 5.66184C44.3151 5.65346 44.3452 5.64516 44.375 5.6364C44.6518 5.51387 45.1264 5.26881 45.1264 4.90122C45.1264 4.53363 44.9682 4.4111 44.7309 4.4111C43.1885 4.4111 38.1656 6.82085 38.1656 8.29121C38.1656 8.3729 38.2843 9.10808 39.0753 9.10808ZM38.0083 13.4862C37.8067 13.3405 37.612 13.1999 37.612 12.7841C37.612 12.3756 37.8097 12.2123 38.0866 12.2123C39.3917 12.2123 42.5952 15.6839 42.5952 17.4402C42.5952 17.9712 42.1997 18.1345 41.8438 18.1345C41.1237 18.1345 40.7466 17.5389 40.3699 16.9439C40.1466 16.5912 39.9234 16.2387 39.629 16.0107C39.194 15.6431 38.5216 14.8262 38.4425 14.1727C38.4037 13.7717 38.2028 13.6266 38.0083 13.4862ZM28.4363 20.7074C28.4363 21.2384 28.555 21.606 29.1482 21.606C30.0002 21.606 30.5712 20.3732 31.2395 18.9303C31.4399 18.4977 31.6491 18.0462 31.8772 17.6033C32.2609 16.8468 32.5831 16.3126 32.8641 15.8468C33.2203 15.2564 33.5103 14.7757 33.7756 14.0908C33.8691 13.8203 34.0424 13.7234 34.199 13.6359C34.3733 13.5385 34.527 13.4527 34.527 13.1514C34.527 12.7838 34.2502 12.6613 33.9338 12.6613C32.3518 12.6613 28.4363 19.0329 28.4363 20.7074ZM32.2396 9.37038C31.9972 9.28266 31.7402 9.18966 31.5212 9.18966C30.9279 9.18966 28.2781 8.90376 28.2385 7.22918C28.2385 6.82075 28.5154 6.53484 29.0691 6.53484C30.4138 6.53484 33.1031 8.0052 33.1031 9.14882C33.1031 9.6829 32.6974 9.53605 32.2396 9.37038Z" fill="#007377"/>
+        </svg></div>
+
+    <div class="start-body">
+      <div>
+        <h1 class="start-title">Before testing…</h1>
+        <p class="start-lede">For the best result, we ask you to save this prototype to your home screen and run it from there.</p>
+      </div>
+
+      <ol class="start-steps">
+        <li class="start-step">
+          <span class="start-step-num">1</span>
+          <span class="start-step-text">Open this page in a browser — <strong>Safari</strong> or <strong>Chrome</strong>.<br><button class="start-copy" id="copyLinkBtn" type="button">
+            <svg class="start-copy-idle" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="6.75" y="6.75" width="10" height="10.5" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M13 6.5V4.6C13 3.72 12.28 3 11.4 3H4.6C3.72 3 3 3.72 3 4.6V11.4C3 12.28 3.72 13 4.6 13H6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <svg class="start-copy-done" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5L8 14.5L16 5.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="start-copy-label">Copy link</span>
+          </button></span>
+        </li>
+        <li class="start-step">
+          <span class="start-step-num">2</span>
+          <span class="start-step-text">Tap the <strong>Share</strong> button <svg class="start-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.5V14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8.5 7L12 3.5L15.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10H6.5C5.67157 10 5 10.6716 5 11.5V19C5 19.8284 5.67157 20.5 6.5 20.5H17.5C18.3284 20.5 19 19.8284 19 19V11.5C19 10.6716 18.3284 10 17.5 10H16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg> in the browser toolbar.</span>
+        </li>
+        <li class="start-step">
+          <span class="start-step-num">3</span>
+          <span class="start-step-text">Choose <strong>Add to Home Screen</strong> <svg class="start-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5" stroke="currentColor" stroke-width="1.8"/><path d="M12 8.25V15.75M8.25 12H15.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>, then tap <strong>Add</strong>.</span>
+        </li>
+      </ol>
+
+      <p class="start-note">Now launch it from your home screen icon. This screen won't show up again there — you'll go straight into the app.</p>
+    </div>
+
+    <div class="start-cta">
+      <button class="start-btn" id="startBtn">Start prototype</button>
+    </div>
+
+  </div><!-- /start-screen -->
+
 </div><!-- /app -->
 
 <script>
@@ -2275,6 +2408,58 @@ document.addEventListener('contextmenu', e => {
   }
 });
 
+
+/* ─────────────────────────────────────────
+   START SCREEN — install instructions
+   Skipped entirely when the prototype is already launched from the home
+   screen, so testers only ever see it in the browser.
+───────────────────────────────────────── */
+const startScreen = document.getElementById('startScreen');
+const isStandalone = window.navigator.standalone === true ||
+  window.matchMedia('(display-mode: standalone)').matches;
+
+if (isStandalone) startScreen.classList.add('dismissed');
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  startScreen.classList.add('dismissed');
+});
+
+/* Copy the prototype's own URL, so a tester who arrived through an in-app
+   browser can paste it into Safari, where Add to Home Screen exists. */
+const copyLinkBtn = document.getElementById('copyLinkBtn');
+const copyLinkLabel = copyLinkBtn.querySelector('.start-copy-label');
+let _copyResetTimer = null;
+
+async function copyPrototypeLink() {
+  const url = window.location.href;
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(url);
+    ok = true;
+  } catch (err) {
+    /* No clipboard API on file:// or older iOS Safari — fall back to a
+       throwaway textarea, which needs an explicit range on iOS. */
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:absolute; left:-9999px; top:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, url.length);
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    document.body.removeChild(ta);
+  }
+
+  copyLinkBtn.classList.toggle('copied', ok);
+  copyLinkLabel.textContent = ok ? 'Link copied' : 'Copy from the address bar';
+  clearTimeout(_copyResetTimer);
+  _copyResetTimer = setTimeout(() => {
+    copyLinkBtn.classList.remove('copied');
+    copyLinkLabel.textContent = 'Copy link';
+  }, 2500);
+}
+
+copyLinkBtn.addEventListener('click', copyPrototypeLink);
 </script>
 </body>
 </html>
