@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Photobox">
+  <title>Photobox</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --accent:       #007377;
+      --accent-mid:   #008e93;
+      --bg:           #ffffff;
+      --bg-light:     #fafafa;
+      --bg-grey:      #f4f4f4;
+      --text:         #333333;
+      --text-muted:   #777777;
+      --sale:         #f25f70;
+      --border:       #e5e5ea;
+      --border-dark:  #cccccc;
+      --radius:       8px;
+      --tab-h:        83px;          /* 50px icons + 30px home bar + 3px top separator */
+      --nav-h:        52px;
+    }
+
+    html, body { height: 100%; background: #000; overflow: hidden; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: var(--text);
+    }
+
+    #app {
+      width: 100%; height: 100%;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* ── SCREEN SYSTEM ── */
+    .screen {
+      position: absolute; inset: 0;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.36s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+      z-index: 1;
+    }
+    .screen.active  { transform: translateX(0); z-index: 2; }
+    .screen.behind  { transform: translateX(-28%); z-index: 1; }
+    .screen.base    { transform: translateX(0); z-index: 1; }
+
+    /* ── SHARED SCROLL AREA ── */
+    .scroll-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+    .scroll-body::-webkit-scrollbar { display: none; }
+
+    /* ── SHARED NAV HEADER ── */
+    .nav-header {
+      height: var(--nav-h);
+      display: flex; align-items: center;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+      flex-shrink: 0;
+    }
+    .nav-back {
+      width: 52px; height: 44px;
+      display: flex; align-items: center; justify-content: flex-start;
+      padding-left: 16px;
+      color: var(--accent);
+      font-size: 17px; font-weight: 400;
+      cursor: pointer;
+      gap: 2px;
+      text-decoration: none;
+    }
+    .nav-back svg { margin-right: 2px; }
+    .nav-title {
+      flex: 1; text-align: center;
+      font-size: 17px; font-weight: 600;
+      color: var(--text);
+      margin-right: 52px; /* balance the back button */
+    }
+    /* iOS-style large title (Memories tab) */
+    .mem-large-title {
+      margin: 0;
+      padding: 28px 16px 14px;
+      font-size: 34px; font-weight: 700;
+      letter-spacing: -0.6px;
+      color: var(--text);
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+
+    /* ── TAB BAR ── */
+    .tab-bar {
+      height: var(--tab-h);
+      background: var(--bg);
+      border-top: 1px solid var(--border-dark);
+      display: flex; flex-direction: column;
+      flex-shrink: 0;
+    }
+    .tab-bar-inner {
+      display: flex; flex: 1;
+    }
+    .tab-item {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 2px; padding-top: 4px;
+      position: relative; cursor: pointer;
+    }
+    .tab-item.active { color: var(--accent); }
+    .tab-item:not(.active) { color: var(--text-muted); }
+    .tab-item.active::before {
+      content: ''; position: absolute; top: -1px; left: 16px; right: 16px;
+      height: 2px; background: var(--accent);
+    }
+    .tab-item svg { width: 24px; height: 24px; }
+    .tab-label { font-size: 10px; font-weight: 500; letter-spacing: -0.24px; }
+    .tab-home-bar {
+      height: 30px; display: flex; align-items: center; justify-content: center;
+    }
+    .tab-home-indicator {
+      width: 134px; height: 5px; background: #000; border-radius: 100px;
+    }
+
+    /* ═══════════════════════════════════════════════
+       SCREEN 1 — HOME
+    ═══════════════════════════════════════════════ */
+
+    /* Home header */
+    .home-header {
+      height: 52px;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      flex-shrink: 0;
+      position: sticky; top: 0; z-index: 10;
+      border-bottom: 1px solid var(--border);
+    }
+    .home-header-inner {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+    }
+    .home-logo { display: block; }
+
+    /* Banner */
+    .banner-strip {
+      overflow-x: auto; overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .banner-strip::-webkit-scrollbar { display: none; }
+    .banner-cards { display: flex; gap: 0; }
+    .banner-card {
+      min-width: 100vw;
+      scroll-snap-align: start;
+      background: var(--accent-mid);
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 4px;
+      border-right: 1px solid rgba(255,255,255,0.35);
+    }
+    .banner-card-title {
+      font-size: 20px; font-weight: 600; line-height: 24px;
+      letter-spacing: 0.38px; color: white; text-align: center;
+    }
+    .banner-card-sub {
+      font-size: 12px; line-height: 16px; color: white; text-align: center;
+    }
+    .banner-card-sub strong { font-weight: 700; }
+
+    /* Section header */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 16px 0;
+    }
+    .section-title {
+      font-size: 13px; font-weight: 600;
+      letter-spacing: -0.08px; color: var(--text);
+    }
+    .section-action {
+      font-size: 13px; font-weight: 600;
+      letter-spacing: -0.08px; color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Section subtitle (Memories header) */
+    .section-header-text { display: flex; flex-direction: column; gap: 2px; }
+    .section-title-large {
+      font-size: 20px; font-weight: 700;
+      letter-spacing: -0.4px; color: var(--text); line-height: 1.2;
+    }
+    .section-subtitle {
+      font-size: 13px; color: #888; font-weight: 400;
+      letter-spacing: -0.1px;
+    }
+
+    /* ── Memories promo banner (home) ── */
+    .mem-banner {
+      position: relative;
+      margin: 12px 16px 4px;
+      background: #886BB3;
+      border-radius: 22px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.18s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mem-banner:active { transform: scale(0.98); }
+
+    .mem-banner-top {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 18px 16px;
+    }
+    .mem-banner-text { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+    .mem-banner-eyebrow {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 1.2px; text-transform: uppercase;
+      color: rgba(255,255,255,0.8);
+    }
+    .mem-banner-eyebrow svg { width: 14px; height: 14px; color: rgba(255,255,255,0.8); }
+    .mem-banner-title {
+      font-size: 21px; font-weight: 700;
+      line-height: 27px; letter-spacing: -0.4px;
+      color: #ffffff;
+    }
+    .mem-banner-arrow {
+      flex-shrink: 0;
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: #ffffff;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mem-banner-arrow svg { width: 24px; height: 24px; color: #1c1c1e; }
+
+    /* Animated album-cover tiles, cropped by the banner's bottom edge */
+    .mem-banner-tiles {
+      height: 58px;                 /* less than tile height → tiles run off the edge */
+      overflow: hidden;
+      padding-left: 18px;           /* start inset; kept off the track so the loop stays exact */
+    }
+    .mem-banner-track {
+      display: flex; gap: 12px;
+      width: max-content;
+      animation: memBannerSlide 26s linear infinite;
+    }
+    .mem-banner:active .mem-banner-track { animation-play-state: paused; }
+    .mem-banner-tile {
+      flex-shrink: 0;
+      width: 116px; height: 86px;
+      border-radius: 12px 12px 0 0;
+      overflow: hidden;
+      background: rgba(255,255,255,0.18);
+    }
+    .mem-banner-tile img {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      pointer-events: none;
+    }
+    @keyframes memBannerSlide {
+      from { transform: translateX(0); }
+      to   { transform: translateX(calc(-50% - 6px)); }   /* half the track + half a gap */
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .mem-banner-track { animation: none; }
+    }
+
+    /* Product cards */
+    .product-cards { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+    .product-card {
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--bg-light);
+    }
+    .product-card-img { height: 180px; width: 100%; object-fit: cover; display: block; }
+    .product-card-body { padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+    .product-card-name {
+      font-size: 17px; font-weight: 600;
+      line-height: 22px; letter-spacing: -0.41px; color: var(--text);
+    }
+    .product-card-price {
+      font-size: 17px; font-weight: 700;
+      line-height: 22px; color: var(--text);
+    }
+
+    /* ═══════════════════════════════════════════════
+       SCREEN 2 — MEMORIES
+    ═══════════════════════════════════════════════ */
+
+    /* The tab bar below owns the home-indicator inset, so this only needs
+       a little breathing room at the end of the list.
+       position:relative makes this the offsetParent of the year blocks, so
+       their offsetTop is measured inside the scroller (used by the jump bar). */
+    .mem-scroll {
+      position: relative;
+      padding-bottom: 16px;
+    }
+
+    /* Year filter — fixed row under the header */
+    .mem-year-filter {
+      flex-shrink: 0;
+      height: 50px;
+      background: var(--bg);
+      display: flex; align-items: center;
+      overflow-x: auto; overflow-y: hidden;
+      padding: 0 8px;
+      scrollbar-width: none;
+    }
+    .mem-year-filter::-webkit-scrollbar { display: none; }
+    .mem-year-chips { display: flex; gap: 8px; align-items: center; }
+    .mem-year-chip {
+      flex-shrink: 0;
+      padding: 8px 12px;
+      border-radius: 22px;
+      border: 1px solid transparent;
+      background: #eeeeee;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px; font-weight: 600;
+      line-height: 18px; letter-spacing: -0.08px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .mem-year-chip.active {
+      background: var(--accent);
+      border-color: var(--accent-mid);
+      color: #ffffff;
+    }
+
+    /* Album list — one block per year, all years in one scroll */
+    .mem-albums {
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 24px;
+    }
+    .mem-year-block { display: flex; flex-direction: column; gap: 16px; }
+    .mem-year-heading {
+      font-size: 20px; font-weight: 600;
+      line-height: 24px; letter-spacing: 0.38px;
+      color: var(--text);
+    }
+    .mem-album-list { display: flex; flex-direction: column; gap: 16px; }
+
+    .mem-album-card {
+      position: relative;
+      height: 200px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--bg-grey);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mem-album-card:active { opacity: 0.9; }
+    .mem-album-card img {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      pointer-events: none;
+      -webkit-touch-callout: none;
+    }
+    .mem-album-card-overlay {
+      position: absolute; left: -1px; right: -1px; bottom: -1px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.8));
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 12px;
+    }
+    .mem-album-name {
+      font-size: 17px; font-weight: 600;
+      line-height: 22px; letter-spacing: -0.41px;
+      color: #ffffff;
+    }
+    .mem-album-date {
+      font-size: 13px; font-weight: 400;
+      line-height: 18px; letter-spacing: -0.078px;
+      color: #ffffff;
+    }
+
+    /* ═══════════════════════════════════════════════
+       SCREEN 3 — ALBUM
+    ═══════════════════════════════════════════════ */
+
+    #screen-album { background: var(--bg); }
+
+    /* Album scroll container */
+    .album-scroll {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+    }
+    .album-scroll::-webkit-scrollbar { display: none; }
+
+    /* Controls row — horizontally scrollable pills */
+    .album-controls {
+      flex-shrink: 0;
+      background: var(--bg);
+      overflow-x: auto; overflow-y: hidden;
+      padding: 10px 16px;
+      scrollbar-width: none;
+    }
+    .album-controls::-webkit-scrollbar { display: none; }
+    .album-controls-row { display: flex; gap: 6px; align-items: center; }
+
+    .album-ctrl {
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 5px;
+      /* Bigger type, same 34px pill: the fixed line-height holds the height,
+         so the extra width is bought back from the side padding. */
+      padding: 7px 10px;
+      border-radius: 18px;
+      border: 1px solid transparent;
+      background: #eeeeee;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 15px; font-weight: 600;
+      line-height: 18px; letter-spacing: -0.24px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .album-ctrl svg { width: 17px; height: 17px; flex-shrink: 0; }
+    .album-ctrl.active {
+      background: var(--accent);
+      border-color: var(--accent-mid);
+      color: #ffffff;
+    }
+
+    /* "Select Recommended" strictness menu — iOS drop-menu look */
+    .rec-menu-backdrop {
+      position: absolute; inset: 0; z-index: 30;
+      display: none;
+    }
+    .rec-menu-backdrop.open { display: block; }
+    .rec-menu {
+      position: absolute; z-index: 31;
+      min-width: 236px;
+      background: rgba(250,250,250,0.94);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: blur(20px) saturate(180%);
+      border-radius: 14px;
+      box-shadow: 0 12px 34px rgba(0,0,0,0.22), 0 1px 3px rgba(0,0,0,0.10);
+      overflow: hidden;
+      transform-origin: top left;
+      transform: scale(0.92); opacity: 0;
+      transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s ease;
+      pointer-events: none;
+    }
+    .rec-menu.open { transform: scale(1); opacity: 1; pointer-events: auto; }
+    .rec-menu-caption {
+      padding: 9px 14px 5px;
+      font-size: 12px; font-weight: 600;
+      letter-spacing: 0.2px; text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .rec-menu-item {
+      width: 100%;
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px;
+      background: none; border: none;
+      border-top: 0.5px solid rgba(60,60,67,0.16);
+      font-family: inherit;
+      cursor: pointer;
+      text-align: left;
+    }
+    .rec-menu-item:active { background: rgba(0,0,0,0.06); }
+    .rec-menu-check {
+      width: 16px; height: 16px; flex-shrink: 0;
+      color: var(--accent);
+      opacity: 0;
+    }
+    .rec-menu-item.active .rec-menu-check { opacity: 1; }
+    .rec-menu-label {
+      flex: 1;
+      font-size: 16px; font-weight: 400;
+      letter-spacing: -0.32px; color: var(--text);
+    }
+    .rec-menu-count {
+      font-size: 15px; font-weight: 400;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    /* "Unselect" is its own group, so it gets iOS's thicker section break */
+    .rec-menu-item.rec-menu-clear {
+      border-top: 6px solid rgba(60,60,67,0.10);
+    }
+    .rec-menu-clear-icon {
+      width: 16px; height: 16px; flex-shrink: 0;
+      color: var(--text-muted);
+    }
+
+    /* Chapter section */
+    .chapter-section { margin-bottom: 0; }
+    .chapter-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px 8px;
+    }
+    .chapter-info {}
+    .chapter-name {
+      font-size: 17px; font-weight: 600;
+      line-height: 22px; letter-spacing: -0.41px;
+      color: var(--text);
+    }
+    .chapter-date {
+      font-size: 13px; font-weight: 400;
+      line-height: 18px; color: var(--text-muted);
+      margin-top: 1px;
+    }
+    /* Select control — v1's pill, used by both variants */
+    .chapter-select {
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px 8px 10px;
+      border-radius: 22px;
+      background: var(--bg-grey);
+      font-size: 16px; font-weight: 600;
+      line-height: 21px; letter-spacing: -0.32px;
+      color: var(--accent);
+      cursor: pointer;
+    }
+    .chapter-select svg { width: 22px; height: 22px; flex-shrink: 0; }
+    .chapter-select.active { background: var(--accent); color: #ffffff; }
+    /* On the teal pill, invert the tick: white disc, teal check */
+    .chapter-select.active svg circle { fill: #ffffff; }
+    .chapter-select.active svg path { stroke: var(--accent); }
+
+    /* Photo grid */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5px;
+      padding: 0 0 2px;
+    }
+    .photo-cell {
+      aspect-ratio: 1;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      background: var(--bg-grey);
+    }
+    .photo-cell img {
+      width: 100%; height: 100%; object-fit: cover;
+      display: block;
+      -webkit-touch-callout: none; pointer-events: none;
+    }
+    .photo-cell.selected::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(0, 115, 119, 0.3);
+    }
+    .photo-cell.selected .photo-check {
+      display: flex;
+    }
+    .photo-check {
+      display: none;
+      position: absolute; top: 8px; right: 8px;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      align-items: center; justify-content: center;
+    }
+    .photo-check svg { width: 14px; height: 14px; }
+
+    /* Bottom CTA */
+    .bottom-cta {
+      position: sticky; bottom: 0; z-index: 15;
+      background: var(--bg);
+      padding: 12px 16px 12px;
+      border-top: 1px solid var(--border);
+    }
+    .bottom-cta.hidden { display: none; }
+    .cta-btn {
+      width: 100%; height: 52px;
+      background: var(--accent);
+      border-radius: 26px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
+      cursor: pointer;
+    }
+    .cta-btn-text {
+      font-size: 17px; font-weight: 600; color: white;
+      letter-spacing: -0.41px;
+    }
+    .cta-btn-count {
+      background: rgba(255,255,255,0.25);
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 15px; font-weight: 600; color: white;
+    }
+
+    /* Selection mode (album page) */
+    body.selecting .bottom-cta { display: block; }
+
+    /* ── safe-area padding for bottom ── */
+    .tab-home-bar, .bottom-cta {
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+    .bottom-cta { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+
+    /* ─── SHARED: sub-screen nav bar ─────────────────────────── */
+    .sub-nav {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+      height: 52px;
+      background: #fff;
+      border-bottom: 1px solid #e8e8e8;
+      flex-shrink: 0;
+    }
+    .sub-nav-back {
+      position: absolute; left: 16px;
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px;
+      background: none; border: none; cursor: pointer;
+      color: var(--accent);
+    }
+    .sub-nav-title {
+      font-size: 17px; font-weight: 600;
+      letter-spacing: -0.41px; color: var(--text);
+    }
+
+    /* ─── SCREEN: FORMAT SELECTION ────────────────────────────── */
+    #screen-format { background: #fff; }
+    .format-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+    .format-scroll::after { content: ''; display: block; height: 8px; flex-shrink: 0; }
+    .format-card {
+      border-radius: 12px; overflow: hidden;
+      border: 1px solid #e8e8e8;
+      flex-shrink: 0;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .format-card:active { opacity: 0.85; }
+    .format-card-img {
+      width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;
+    }
+    .format-card-info { padding: 14px 16px 18px; }
+    .format-card-name { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .format-card-sale { font-size: 15px; font-weight: 500; color: #e8344a; }
+
+    /* ─── SCREEN: TYPE SELECTION ──────────────────────────────── */
+    #screen-type { background: #fff; }
+    .type-scroll {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 16px; display: flex; flex-direction: column; gap: 16px;
+    }
+    .type-scroll::after { content: ''; display: block; height: 8px; flex-shrink: 0; }
+    .type-card {
+      border-radius: 12px; overflow: hidden;
+      border: 1px solid #e8e8e8;
+      flex-shrink: 0;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .type-card:active { opacity: 0.85; }
+    .type-card-img {
+      width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;
+    }
+    .type-card-info { padding: 14px 16px 18px; }
+    .type-card-name { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .type-card-price { font-size: 15px; font-weight: 500; color: var(--text); }
+    .type-card-chevron { display: none; }
+
+    /* ─── SCREEN: PDP ─────────────────────────────────────────── */
+    #screen-pdp { background: #fff; }
+    .pdp-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .pdp-hero { position: relative; width: 100%; height: 46vh; flex-shrink: 0; }
+    .pdp-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pdp-hero-back {
+      position: absolute; top: 12px; left: 12px;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--accent);
+    }
+    .pdp-hero-counter {
+      position: absolute; bottom: 12px; right: 12px;
+      background: rgba(0,0,0,0.55); color: #fff;
+      font-size: 12px; padding: 3px 8px; border-radius: 10px;
+    }
+    .pdp-body { padding: 20px 16px; }
+    .pdp-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+    .pdp-price-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .pdp-price { font-size: 20px; font-weight: 700; color: var(--text); }
+    .pdp-badge {
+      background: #fff5f0; border: 1px solid #f25f70;
+      color: #e8344a; font-size: 12px; font-weight: 600;
+      padding: 3px 8px; border-radius: 12px;
+    }
+    .pdp-desc { font-size: 15px; color: #555; line-height: 1.5; margin-bottom: 20px; }
+    .pdp-divider { height: 1px; background: #e8e8e8; margin: 0 0 18px; }
+    .pdp-specs { display: flex; gap: 24px; margin-bottom: 20px; }
+    .pdp-spec { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+    .pdp-spec-label { font-size: 13px; color: #777; text-align: center; }
+    .pdp-delivery {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: #f7f7f7; border-radius: 10px;
+      padding: 14px; margin-bottom: 20px;
+    }
+    .pdp-delivery-text { font-size: 14px; color: var(--text); line-height: 1.4; }
+    .pdp-delivery-link { color: var(--accent); font-size: 14px; }
+    .pdp-feature { display: flex; align-items: center; gap: 10px; padding: 14px 0; }
+    .pdp-feature-label { font-size: 15px; color: var(--text); }
+    .pdp-create-wrap {
+      padding: 12px 16px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+      background: #fff; border-top: 1px solid #e8e8e8;
+      flex-shrink: 0;
+    }
+    .pdp-create-btn {
+      width: 100%; padding: 16px;
+      background: var(--accent); color: #fff;
+      border: none; border-radius: 14px;
+      font-size: 17px; font-weight: 600;
+      cursor: pointer; letter-spacing: 0.1px;
+    }
+    .pdp-create-btn:active { opacity: 0.85; }
+
+    /* ─── SCREEN: UPLOAD ──────────────────────────────────────── */
+    #screen-upload { background: #fff; }
+    .upload-body { flex: 1; padding: 24px 16px; }
+    .upload-title { font-size: 34px; font-weight: 700; color: var(--text); line-height: 1.15; margin-bottom: 12px; }
+    .upload-subtitle { font-size: 15px; color: #777; margin-bottom: 32px; }
+    .upload-progress-bar-wrap {
+      height: 6px; background: #e8e8e8; border-radius: 3px; overflow: hidden; margin-bottom: 8px;
+    }
+    .upload-progress-bar {
+      height: 100%; background: var(--accent); border-radius: 3px;
+      width: 1%; transition: width 0.4s ease;
+    }
+    .upload-status-row { display: flex; justify-content: space-between; align-items: center; }
+    .upload-status-text { font-size: 13px; color: #999; }
+    /* polaroid illustration */
+    .upload-illustration {
+      position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+      width: 100px; height: 118px;
+      background: #fff; border: 1px solid #e0d5cc;
+      box-shadow: 2px 4px 12px rgba(0,0,0,0.12);
+      border-radius: 3px;
+      transform: translateX(-50%) rotate(-8deg);
+      display: flex; flex-direction: column; align-items: center; padding-top: 6px;
+    }
+    .upload-illustration-inner {
+      width: 82px; height: 76px;
+      background: linear-gradient(160deg, #ffe4b0 0%, #ffcc70 45%, #87ceeb 60%, #fff 100%);
+      border-radius: 2px; overflow: hidden; position: relative;
+    }
+    .upload-illustration-inner::after {
+      content: ''; position: absolute;
+      bottom: 12px; left: 50%; transform: translateX(-50%);
+      width: 30px; height: 20px;
+      border-left: 15px solid transparent; border-right: 15px solid transparent;
+      border-bottom: 20px solid rgba(255,255,255,0.7);
+    }
+
+    /* ─── SCREEN: EDITOR ─────────────────────────────────────── */
+    #screen-editor { background: #eeeeee; }
+
+    .editor-header {
+      height: 56px;
+      background: #fff;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 8px 0 0;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .editor-header-left { display: flex; align-items: center; }
+    .editor-hamburger {
+      width: 48px; height: 48px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--text); flex-shrink: 0;
+    }
+    .editor-header-title {
+      font-size: 16px; font-weight: 700; color: #3c3c3b;
+      white-space: nowrap;
+    }
+    .editor-header-right { display: flex; align-items: center; gap: 8px; }
+    .editor-save-icon {
+      width: 24px; height: 24px; color: var(--accent);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .editor-done-btn {
+      height: 40px; background: var(--accent); color: #fff;
+      border: none; border-radius: 4px; padding: 0 20px;
+      font-size: 16px; font-weight: 700; cursor: pointer;
+      font-family: inherit;
+    }
+    .editor-done-btn:active { opacity: 0.85; }
+
+    .editor-scroll {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding: 16px 0 48px;
+      position: relative;
+    }
+    .editor-scroll::-webkit-scrollbar { display: none; }
+
+    /* Undo/Redo floating toolbar */
+    .editor-toolbar {
+      position: absolute; top: 12px; left: 20px;
+      background: #fff; border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      display: flex; align-items: center; padding: 4px; gap: 2px;
+      z-index: 5; opacity: 0.5;
+    }
+    .editor-tool-btn {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #333;
+      border: none; background: none; border-radius: 2px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .editor-tool-btn:active { background: #f0f0f0; }
+
+    /* Spreads list */
+    .editor-spreads {
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+      padding-top: 64px; /* below floating toolbar */
+    }
+    .spread-group { margin-bottom: 24px; }
+
+    .spread-card {
+      width: 320px; height: 160px;
+      display: flex; position: relative;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+      cursor: pointer;
+    }
+    .spread-page {
+      width: 160px; height: 160px;
+      background: #fff; flex-shrink: 0;
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .spread-page-photo {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%; object-fit: cover;
+      display: block; pointer-events: none; -webkit-touch-callout: none;
+    }
+    /* Cover page: image inset with title text below */
+    .cover-front .spread-page-photo {
+      top: 10px; left: 14px; right: 14px; bottom: 24px;
+      width: auto; height: auto;
+    }
+    .spread-cover-title {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 6px; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase; color: #333;
+    }
+
+    /* Spine overlay */
+    .spread-spine {
+      position: absolute; left: 50%; top: 0; bottom: 0;
+      width: 14px; transform: translateX(-50%); z-index: 3;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    .spread-spine::before {
+      content: ''; position: absolute; left: 50%; top: 0; bottom: 0;
+      width: 1px; background: rgba(0,0,0,0.12);
+    }
+    .spread-spine-text {
+      font-size: 5px; font-weight: 700; letter-spacing: 1.2px;
+      text-transform: uppercase; color: #555;
+      writing-mode: vertical-rl; transform: rotate(180deg);
+      white-space: nowrap; position: relative; z-index: 1;
+    }
+
+    /* Add photo icon */
+    .spread-add-icon { color: #c0c0c0; }
+
+    /* Page number labels */
+    .spread-labels {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 320px; padding: 5px 4px 0;
+    }
+    .spread-lbl {
+      font-size: 12px; color: var(--text); font-weight: 400;
+    }
+    .spread-lbl-center {
+      font-size: 12px; color: var(--text); font-weight: 400;
+      flex: 1; text-align: center;
+    }
+
+    /* ─── HIDDEN PHOTOS BOTTOM SHEET ──────────────────────────── */
+    .hidden-sheet-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .hidden-sheet-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .hidden-sheet {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      height: calc(100% - 54px);
+      background: #fff;
+      border-radius: 32px 32px 0 0;
+      z-index: 201;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.36s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+    .hidden-sheet.open {
+      transform: translateY(0);
+    }
+
+    .hidden-sheet-close {
+      position: absolute;
+      top: 20px; right: 16px;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      background: none; border: none;
+      color: var(--text);
+      z-index: 10;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .hidden-sheet-header {
+      padding: 44px 21px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .hidden-sheet-icon-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 13px;
+    }
+    .hidden-sheet-icon {
+      width: 24px; height: 24px;
+      color: var(--text);
+    }
+    .hidden-sheet-title {
+      font-size: 20px; font-weight: 600;
+      color: #000;
+      text-align: center;
+      letter-spacing: 0.38px;
+      line-height: 24px;
+    }
+    .hidden-sheet-desc {
+      font-size: 13px; font-weight: 400;
+      color: var(--text);
+      text-align: center;
+      line-height: 18px;
+      letter-spacing: -0.08px;
+    }
+
+    .hidden-sheet-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+    .hidden-sheet-scroll::-webkit-scrollbar { display: none; }
+
+    .hidden-sheet-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5px;
+      padding-bottom: 2px;
+    }
+
+    .hidden-photo-cell {
+      aspect-ratio: 1;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      background: var(--bg-grey);
+    }
+    .hidden-photo-cell img {
+      width: 100%; height: 100%; object-fit: cover;
+      display: block;
+      -webkit-touch-callout: none; pointer-events: none;
+    }
+    .hidden-photo-cell.selected::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(0,115,119,0.3);
+    }
+    .hidden-photo-cell.selected .hidden-photo-check {
+      display: flex;
+    }
+    .hidden-photo-check {
+      display: none;
+      position: absolute; top: 8px; right: 8px;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    .hidden-photo-check svg { width: 14px; height: 14px; }
+
+    .hidden-sheet-cta {
+      flex-shrink: 0;
+      background: var(--bg);
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border);
+      display: none;
+    }
+    .hidden-sheet-cta.visible {
+      display: block;
+    }
+    .unhide-btn {
+      width: 100%; height: 52px;
+      background: var(--accent);
+      border-radius: 26px;
+      border: none;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; font-weight: 600; color: white;
+      letter-spacing: -0.41px;
+      cursor: pointer;
+    }
+    .unhide-btn:active { opacity: 0.85; }
+
+  </style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══════════════════ SCREEN 1: HOME ═══════════════════ -->
+  <div class="screen base" id="screen-home">
+
+    <header class="home-header">
+      <div class="home-header-inner">
+        <!-- PHOTOBOX logo -->
+        <svg class="home-logo" width="118" height="22" viewBox="0 0 118.222 21.606" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Photobox">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M34.8341 2.64998C34.7121 2.01081 34.6061 1.45561 34.6061 1.14361C34.6061 0.204217 35.318 0 35.5949 0C36.5441 0 36.7814 1.10277 36.7814 1.67458C36.7814 2.01185 36.7334 2.1882 36.6903 2.34674C36.6551 2.47619 36.6232 2.59376 36.6232 2.77734C36.6232 3.58485 36.4784 4.47543 36.3735 5.12061L36.3735 5.12067C36.3139 5.48708 36.2672 5.77434 36.2672 5.92228C36.2672 6.33071 36.0695 6.57577 35.7531 6.57577C35.3719 6.57577 35.2969 5.8907 35.2001 5.00731L35.2001 5.00694L35.2 5.00587L35.1999 5.0054L35.1998 5.00426C35.1762 4.78871 35.1513 4.5614 35.1203 4.32939C35.0484 3.77266 34.9357 3.18221 34.8341 2.64998ZM60.8277 11.4362C60.8277 14.9487 63.438 17.8486 66.8788 17.8486C70.3196 17.8486 72.9299 14.9079 72.9299 11.4362C72.9299 7.96451 70.2801 5.06463 66.8788 5.06463C63.4775 5.06463 60.8277 7.96451 60.8277 11.4362ZM5.65563 12.6206H1.93794V16.7458C1.93794 17.3176 1.50289 17.7261 0.949197 17.7261C0.395499 17.7261 0 17.2768 0 16.7458V6.12655C0 5.55474 0.435048 5.14631 0.949197 5.14631H5.65563C8.46367 5.14631 9.76882 6.94342 9.76882 8.9039C9.76882 10.8644 8.46367 12.6206 5.65563 12.6206ZM5.93244 6.98423H1.97745V10.7827H5.93244C7.19803 10.7827 7.83083 9.88411 7.83083 8.90387C7.83083 7.92363 7.19803 6.98423 5.93244 6.98423ZM22.1874 16.7867C22.1874 17.3176 22.5829 17.7669 23.1366 17.7669C23.6903 17.7669 24.0858 17.3176 24.0858 16.7458V6.12655C24.0858 5.59559 23.6903 5.14631 23.1366 5.14631C22.6225 5.14631 22.1874 5.55474 22.1874 6.12655V10.3743H16.2154V6.12655C16.2154 5.59559 15.8199 5.14631 15.2662 5.14631C14.752 5.14631 14.317 5.55474 14.317 6.12655V16.7458C14.317 17.2768 14.7125 17.726 15.2662 17.726C15.8199 17.726 16.2154 17.3176 16.2154 16.7458V12.2122H22.1874V16.7867ZM57.1891 7.0251H53.6692V16.7458C53.6692 17.3176 53.2341 17.7669 52.6804 17.7669C52.1267 17.7669 51.7312 17.3176 51.7312 16.7458V7.0251H48.2113C47.6971 7.0251 47.3016 6.61667 47.3016 6.08571C47.3016 5.55474 47.6971 5.14631 48.2113 5.14631H57.1891C57.7033 5.14631 58.0988 5.55474 58.0988 6.08571C58.0988 6.61667 57.7033 7.0251 57.1891 7.0251ZM66.8787 6.90256C64.3871 6.90256 62.726 9.02641 62.726 11.477C62.726 13.9276 64.3871 16.0515 66.8787 16.0515C69.3704 16.0515 71.0315 13.9276 71.0315 11.477C71.0315 9.02641 69.3704 6.90256 66.8787 6.90256ZM78.8229 17.7669H83.3711C85.9814 17.7669 87.5238 16.2148 87.4843 14.2544C87.4843 12.784 86.6537 11.4362 85.3091 11.0277C86.2582 10.5376 86.7724 9.4757 86.7724 8.2504C86.7724 6.41245 85.3882 5.14631 83.0547 5.14631H78.8229C78.2692 5.14631 77.8341 5.59559 77.8341 6.16739V16.7458C77.8341 17.3176 78.2692 17.7669 78.8229 17.7669ZM83.2129 7.0249H79.8511V10.2107H83.2129C84.2807 10.2107 84.8344 9.4755 84.8344 8.61779C84.8344 7.71924 84.2412 7.0249 83.2129 7.0249ZM79.8511 12.0079H83.6479C84.9135 12.0079 85.5463 12.9881 85.5858 13.9683C85.5858 14.9077 84.9135 15.888 83.6479 15.888H79.8511V12.0079ZM97.965 17.8486C94.5241 17.8486 91.9139 14.9487 91.9139 11.4362C91.9139 7.96451 94.5637 5.06463 97.965 5.06463C101.406 5.06463 104.016 7.96451 104.016 11.4362C104.016 14.9079 101.406 17.8486 97.965 17.8486ZM93.8123 11.477C93.8123 9.02641 95.4734 6.90256 97.965 6.90256C100.457 6.90256 102.118 9.02641 102.118 11.477C102.118 13.9276 100.457 16.0515 97.965 16.0515C95.4734 16.0515 93.8123 13.9276 93.8123 11.477ZM117.938 17.6035C117.78 17.7261 117.582 17.8077 117.384 17.8077C117.107 17.8077 116.83 17.6852 116.633 17.4402L113.35 12.9474L110.067 17.4402C109.909 17.6444 109.632 17.8077 109.355 17.8077C109.158 17.8077 108.96 17.7261 108.802 17.6035C108.604 17.4402 108.485 17.1951 108.485 16.9092C108.485 16.705 108.525 16.5008 108.683 16.3374L112.243 11.477L108.683 6.61667C108.564 6.4533 108.485 6.24908 108.485 6.04486C108.485 5.71812 108.644 5.47306 108.881 5.30968C109.039 5.228 109.197 5.14631 109.355 5.14631C109.632 5.14631 109.909 5.26884 110.067 5.5139L113.31 9.96582L116.593 5.5139C116.751 5.30968 116.989 5.14631 117.265 5.14631C117.463 5.14631 117.661 5.228 117.819 5.35053C118.017 5.5139 118.175 5.7998 118.175 6.08571C118.175 6.28992 118.096 6.49414 117.977 6.61667L114.418 11.4362L118.017 16.2965C118.136 16.4599 118.215 16.705 118.215 16.8683C118.254 17.1542 118.136 17.3993 117.938 17.6035ZM39.0753 9.10808C39.846 9.10808 41.0274 8.14908 41.8636 7.47034L41.8636 7.47032L41.8637 7.47027C42.2719 7.13896 42.5977 6.87444 42.7534 6.82085C42.7746 6.81209 42.7972 6.80332 42.821 6.7941C43.0186 6.7174 43.2973 6.60926 43.5444 6.2082C43.7562 5.80715 44.0311 5.73156 44.2846 5.66184C44.3151 5.65346 44.3452 5.64516 44.375 5.6364C44.6518 5.51387 45.1264 5.26881 45.1264 4.90122C45.1264 4.53363 44.9682 4.4111 44.7309 4.4111C43.1885 4.4111 38.1656 6.82085 38.1656 8.29121C38.1656 8.3729 38.2843 9.10808 39.0753 9.10808ZM38.0083 13.4862C37.8067 13.3405 37.612 13.1999 37.612 12.7841C37.612 12.3756 37.8097 12.2123 38.0866 12.2123C39.3917 12.2123 42.5952 15.6839 42.5952 17.4402C42.5952 17.9712 42.1997 18.1345 41.8438 18.1345C41.1237 18.1345 40.7466 17.5389 40.3699 16.9439C40.1466 16.5912 39.9234 16.2387 39.629 16.0107C39.194 15.6431 38.5216 14.8262 38.4425 14.1727C38.4037 13.7717 38.2028 13.6266 38.0083 13.4862ZM28.4363 20.7074C28.4363 21.2384 28.555 21.606 29.1482 21.606C30.0002 21.606 30.5712 20.3732 31.2395 18.9303C31.4399 18.4977 31.6491 18.0462 31.8772 17.6033C32.2609 16.8468 32.5831 16.3126 32.8641 15.8468C33.2203 15.2564 33.5103 14.7757 33.7756 14.0908C33.8691 13.8203 34.0424 13.7234 34.199 13.6359C34.3733 13.5385 34.527 13.4527 34.527 13.1514C34.527 12.7838 34.2502 12.6613 33.9338 12.6613C32.3518 12.6613 28.4363 19.0329 28.4363 20.7074ZM32.2396 9.37038C31.9972 9.28266 31.7402 9.18966 31.5212 9.18966C30.9279 9.18966 28.2781 8.90376 28.2385 7.22918C28.2385 6.82075 28.5154 6.53484 29.0691 6.53484C30.4138 6.53484 33.1031 8.0052 33.1031 9.14882C33.1031 9.6829 32.6974 9.53605 32.2396 9.37038Z" fill="#007377"/>
+        </svg>
+      </div>
+    </header>
+
+    <div class="scroll-body">
+      <!-- Banner -->
+      <div class="banner-strip">
+        <div class="banner-cards">
+          <div class="banner-card">
+            <p class="banner-card-title">25% off selected photo books, wall decor and photo gifts</p>
+            <p class="banner-card-sub">Using code <strong>SALE50</strong> ends 12/06/2026</p>
+          </div>
+          <div class="banner-card">
+            <p class="banner-card-title">Free delivery on orders over £25</p>
+            <p class="banner-card-sub">Valid through end of <strong>August 2026</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Memories banner -->
+      <div class="mem-banner" id="memBanner" role="button" tabindex="0" aria-label="Open Memories">
+        <div class="mem-banner-top">
+          <div class="mem-banner-text">
+            <span class="mem-banner-eyebrow">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7.5 4H17C19.2091 4 21 5.79086 21 8V17.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="3" y="6.5" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M4 18L8.5 13.5L11 16L13.5 12.5L16 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Memories
+            </span>
+            <p class="mem-banner-title">Your photos, already sorted into albums</p>
+          </div>
+          <div class="mem-banner-arrow">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="mem-banner-tiles">
+          <!-- Covers of the newest albums; filled by JS as two identical sets
+               so the marquee loop stays seamless. -->
+          <div class="mem-banner-track" id="memBannerTrack"></div>
+        </div>
+      </div>
+
+      <!-- Shop by product -->
+      <div class="section-header" style="margin-top:4px;">
+        <span class="section-title-large">Shop by product</span>
+      </div>
+      <div class="product-cards">
+        <div class="product-card">
+          <img class="product-card-img" src="assets/photo-book%20landscape.jpg" alt="Photo Books Landscape">
+          <div class="product-card-body">
+            <div class="product-card-name">Photo Books — Landscape</div>
+            <div class="product-card-price">from <strong>£14.99</strong></div>
+          </div>
+        </div>
+        <div class="product-card">
+          <img class="product-card-img" src="assets/photo-book%20square.jpg" alt="Photo Books Square">
+          <div class="product-card-body">
+            <div class="product-card-name">Photo Books — Square</div>
+            <div class="product-card-price">from <strong>£14.99</strong></div>
+          </div>
+        </div>
+        <div class="product-card">
+          <img class="product-card-img" src="assets/photo-book%20portrait.jpg" alt="Photo Books Portrait">
+          <div class="product-card-body">
+            <div class="product-card-name">Photo Books — Portrait</div>
+            <div class="product-card-price">from <strong>£14.99</strong></div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /scroll-body -->
+
+    <!-- Tab bar -->
+    <nav class="tab-bar">
+      <div class="tab-bar-inner">
+        <div class="tab-item active" data-tab="home" onclick="switchTab('home')">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 10.5L12 3.5L20 10.5V20C20 20.5523 19.5523 21 19 21H15V15C15 14.4477 14.5523 14 14 14H10C9.44772 14 9 14.4477 9 15V21H5C4.44772 21 4 20.5523 4 20V10.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span class="tab-label">Home</span>
+        </div>
+        <div class="tab-item">
+          <svg viewBox="0 0 20 16" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.1748 0C7.44147 0 7.69583 0.0503906 7.9375 0.150391C8.17911 0.250387 8.3919 0.391897 8.5752 0.575195L10 2H18C18.55 2 19.0204 2.19622 19.4121 2.58789C19.8038 2.97956 20 3.45 20 4V14C20 14.55 19.8038 15.0204 19.4121 15.4121C19.0204 15.8038 18.55 16 18 16H2C1.45 16 0.979557 15.8038 0.587891 15.4121C0.196224 15.0204 0 14.55 0 14V2C0 1.45 0.196224 0.979557 0.587891 0.587891C0.979557 0.196224 1.45 0 2 0H7.1748ZM2 14H18V4H9.1748L7.1748 2H2V14Z" fill="currentColor"/><path d="M11.5752 5.9873C12.1234 5.98735 12.5818 6.16607 12.9492 6.52246C13.3164 6.87882 13.5 7.32288 13.5 7.85449C13.5 8.50511 13.2517 9.10238 12.7559 9.64551C12.2601 10.1885 11.6972 10.7345 11.0674 11.2832L10.4727 11.8096C10.4085 11.8717 10.3336 11.917 10.249 11.9453C10.1646 11.9735 10.0815 11.9873 10 11.9873C9.91847 11.9873 9.83541 11.9735 9.75098 11.9453C9.66644 11.917 9.59148 11.8717 9.52734 11.8096L8.92383 11.2744C8.3055 10.7256 7.74679 10.1809 7.24805 9.64062C6.74941 9.10037 6.50001 8.50504 6.5 7.85449C6.5 7.32288 6.68358 6.87882 7.05078 6.52246C7.41824 6.16607 7.87656 5.98735 8.4248 5.9873C8.73396 5.9873 9.02564 6.05142 9.2998 6.17871C9.57395 6.306 9.80751 6.47956 10 6.7002C10.1925 6.47956 10.426 6.306 10.7002 6.17871C10.9744 6.05142 11.266 5.9873 11.5752 5.9873Z" fill="currentColor"/></svg>
+          <span class="tab-label">Creations</span>
+        </div>
+        <div class="tab-item" data-tab="memories" onclick="switchTab('memories')">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M7.5 4H17C19.2091 4 21 5.79086 21 8V17.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3" y="6.5" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.7"/><circle cx="7.5" cy="11" r="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M4 18L8.5 13.5L11 16L13.5 12.5L16 16.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="tab-label">Memories</span>
+        </div>
+        <div class="tab-item">
+          <svg viewBox="0 0 21.976 19" fill="none"><path d="M4.51288 19C4.06288 19 3.66288 18.8625 3.31288 18.5875C2.96288 18.3125 2.72121 17.9583 2.58788 17.525L0.0378788 8.275C-0.0454545 7.95833 0.00871211 7.66667 0.200379 7.4C0.392045 7.13333 0.654545 7 0.987879 7H5.73788L10.1379 0.45C10.2212 0.316667 10.3379 0.208333 10.4879 0.125C10.6379 0.0416667 10.7962 0 10.9629 0C11.1295 0 11.2879 0.0416667 11.4379 0.125C11.5879 0.208333 11.7045 0.316667 11.7879 0.45L16.1879 7H20.9879C21.3212 7 21.5837 7.13333 21.7754 7.4C21.967 7.66667 22.0212 7.95833 21.9379 8.275L19.3879 17.525C19.2545 17.9583 19.0129 18.3125 18.6629 18.5875C18.3129 18.8625 17.9129 19 17.4629 19H4.51288ZM4.48788 17H17.4879L19.6879 9H2.28788L4.48788 17ZM10.9879 15C11.5379 15 12.0087 14.8042 12.4004 14.4125C12.792 14.0208 12.9879 13.55 12.9879 13C12.9879 12.45 12.792 11.9792 12.4004 11.5875C12.0087 11.1958 11.5379 11 10.9879 11C10.4379 11 9.96705 11.1958 9.57538 11.5875C9.18371 11.9792 8.98788 12.45 8.98788 13C8.98788 13.55 9.18371 14.0208 9.57538 14.4125C9.96705 14.8042 10.4379 15 10.9879 15ZM8.16288 7H13.7879L10.9629 2.8L8.16288 7Z" fill="currentColor"/></svg>
+          <span class="tab-label">Basket</span>
+        </div>
+        <div class="tab-item">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M3.85 15.1C4.7 14.45 5.65 13.9375 6.7 13.5625C7.75 13.1875 8.85 13 10 13C11.15 13 12.25 13.1875 13.3 13.5625C14.35 13.9375 15.3 14.45 16.15 15.1C16.7333 14.4167 17.1875 13.6417 17.5125 12.775C17.8375 11.9083 18 10.9833 18 10C18 7.78333 17.2208 5.89583 15.6625 4.3375C14.1042 2.77917 12.2167 2 10 2C7.78333 2 5.89583 2.77917 4.3375 4.3375C2.77917 5.89583 2 7.78333 2 10C2 10.9833 2.1625 11.9083 2.4875 12.775C2.8125 13.6417 3.26667 14.4167 3.85 15.1ZM10 11C9.01667 11 8.1875 10.6625 7.5125 9.9875C6.8375 9.3125 6.5 8.48333 6.5 7.5C6.5 6.51667 6.8375 5.6875 7.5125 5.0125C8.1875 4.3375 9.01667 4 10 4C10.9833 4 11.8125 4.3375 12.4875 5.0125C13.1625 5.6875 13.5 6.51667 13.5 7.5C13.5 8.48333 13.1625 9.3125 12.4875 9.9875C11.8125 10.6625 10.9833 11 10 11ZM10 20C8.61667 20 7.31667 19.7375 6.1 19.2125C4.88333 18.6875 3.825 17.975 2.925 17.075C2.025 16.175 1.3125 15.1167 0.7875 13.9C0.2625 12.6833 0 11.3833 0 10C0 8.61667 0.2625 7.31667 0.7875 6.1C1.3125 4.88333 2.025 3.825 2.925 2.925C3.825 2.025 4.88333 1.3125 6.1 0.7875C7.31667 0.2625 8.61667 0 10 0C11.3833 0 12.6833 0.2625 13.9 0.7875C15.1167 1.3125 16.175 2.025 17.075 2.925C17.975 3.825 18.6875 4.88333 19.2125 6.1C19.7375 7.31667 20 8.61667 20 10C20 11.3833 19.7375 12.6833 19.2125 13.9C18.6875 15.1167 17.975 16.175 17.075 17.075C16.175 17.975 15.1167 18.6875 13.9 19.2125C12.6833 19.7375 11.3833 20 10 20ZM10 18C10.8833 18 11.7167 17.8708 12.5 17.6125C13.2833 17.3542 14 16.9833 14.65 16.5C14 16.0167 13.2833 15.6458 12.5 15.3875C11.7167 15.1292 10.8833 15 10 15C9.11667 15 8.28333 15.1292 7.5 15.3875C6.71667 15.6458 6 16.0167 5.35 16.5C6 16.9833 6.71667 17.3542 7.5 17.6125C8.28333 17.8708 9.11667 18 10 18ZM10 9C10.4333 9 10.7917 8.85833 11.075 8.575C11.3583 8.29167 11.5 7.93333 11.5 7.5C11.5 7.06667 11.3583 6.70833 11.075 6.425C10.7917 6.14167 10.4333 6 10 6C9.56667 6 9.20833 6.14167 8.925 6.425C8.64167 6.70833 8.5 7.06667 8.5 7.5C8.5 7.93333 8.64167 8.29167 8.925 8.575C9.20833 8.85833 9.56667 9 10 9Z" fill="currentColor"/></svg>
+          <span class="tab-label">Account</span>
+        </div>
+      </div>
+      <div class="tab-home-bar"></div>
+    </nav>
+
+  </div><!-- /screen-home -->
+
+
+  <!-- ═══════════════════ SCREEN 2: MEMORIES (top-level tab) ═══════════════════ -->
+  <div class="screen" id="screen-memories">
+
+    <h1 class="mem-large-title">Memories</h1>
+
+    <!-- Year jump bar — anchors into the list, and tracks the year in view -->
+    <div class="mem-year-filter">
+      <div class="mem-year-chips" id="memYearChips">
+        <!-- Populated by JS from the album data -->
+      </div>
+    </div>
+
+    <div class="scroll-body mem-scroll" id="memScroll">
+      <div class="mem-albums" id="memAlbums">
+        <!-- Populated by JS: one block per year, all years at once -->
+      </div>
+    </div><!-- /scroll-body -->
+
+    <!-- Tab bar -->
+    <nav class="tab-bar">
+      <div class="tab-bar-inner">
+        <div class="tab-item" data-tab="home" onclick="switchTab('home')">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 10.5L12 3.5L20 10.5V20C20 20.5523 19.5523 21 19 21H15V15C15 14.4477 14.5523 14 14 14H10C9.44772 14 9 14.4477 9 15V21H5C4.44772 21 4 20.5523 4 20V10.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span class="tab-label">Home</span>
+        </div>
+        <div class="tab-item">
+          <svg viewBox="0 0 20 16" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.1748 0C7.44147 0 7.69583 0.0503906 7.9375 0.150391C8.17911 0.250387 8.3919 0.391897 8.5752 0.575195L10 2H18C18.55 2 19.0204 2.19622 19.4121 2.58789C19.8038 2.97956 20 3.45 20 4V14C20 14.55 19.8038 15.0204 19.4121 15.4121C19.0204 15.8038 18.55 16 18 16H2C1.45 16 0.979557 15.8038 0.587891 15.4121C0.196224 15.0204 0 14.55 0 14V2C0 1.45 0.196224 0.979557 0.587891 0.587891C0.979557 0.196224 1.45 0 2 0H7.1748ZM2 14H18V4H9.1748L7.1748 2H2V14Z" fill="currentColor"/><path d="M11.5752 5.9873C12.1234 5.98735 12.5818 6.16607 12.9492 6.52246C13.3164 6.87882 13.5 7.32288 13.5 7.85449C13.5 8.50511 13.2517 9.10238 12.7559 9.64551C12.2601 10.1885 11.6972 10.7345 11.0674 11.2832L10.4727 11.8096C10.4085 11.8717 10.3336 11.917 10.249 11.9453C10.1646 11.9735 10.0815 11.9873 10 11.9873C9.91847 11.9873 9.83541 11.9735 9.75098 11.9453C9.66644 11.917 9.59148 11.8717 9.52734 11.8096L8.92383 11.2744C8.3055 10.7256 7.74679 10.1809 7.24805 9.64062C6.74941 9.10037 6.50001 8.50504 6.5 7.85449C6.5 7.32288 6.68358 6.87882 7.05078 6.52246C7.41824 6.16607 7.87656 5.98735 8.4248 5.9873C8.73396 5.9873 9.02564 6.05142 9.2998 6.17871C9.57395 6.306 9.80751 6.47956 10 6.7002C10.1925 6.47956 10.426 6.306 10.7002 6.17871C10.9744 6.05142 11.266 5.9873 11.5752 5.9873Z" fill="currentColor"/></svg>
+          <span class="tab-label">Creations</span>
+        </div>
+        <div class="tab-item active" data-tab="memories" onclick="switchTab('memories')">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M7.5 4H17C19.2091 4 21 5.79086 21 8V17.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3" y="6.5" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.7"/><circle cx="7.5" cy="11" r="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M4 18L8.5 13.5L11 16L13.5 12.5L16 16.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="tab-label">Memories</span>
+        </div>
+        <div class="tab-item">
+          <svg viewBox="0 0 21.976 19" fill="none"><path d="M4.51288 19C4.06288 19 3.66288 18.8625 3.31288 18.5875C2.96288 18.3125 2.72121 17.9583 2.58788 17.525L0.0378788 8.275C-0.0454545 7.95833 0.00871211 7.66667 0.200379 7.4C0.392045 7.13333 0.654545 7 0.987879 7H5.73788L10.1379 0.45C10.2212 0.316667 10.3379 0.208333 10.4879 0.125C10.6379 0.0416667 10.7962 0 10.9629 0C11.1295 0 11.2879 0.0416667 11.4379 0.125C11.5879 0.208333 11.7045 0.316667 11.7879 0.45L16.1879 7H20.9879C21.3212 7 21.5837 7.13333 21.7754 7.4C21.967 7.66667 22.0212 7.95833 21.9379 8.275L19.3879 17.525C19.2545 17.9583 19.0129 18.3125 18.6629 18.5875C18.3129 18.8625 17.9129 19 17.4629 19H4.51288ZM4.48788 17H17.4879L19.6879 9H2.28788L4.48788 17ZM10.9879 15C11.5379 15 12.0087 14.8042 12.4004 14.4125C12.792 14.0208 12.9879 13.55 12.9879 13C12.9879 12.45 12.792 11.9792 12.4004 11.5875C12.0087 11.1958 11.5379 11 10.9879 11C10.4379 11 9.96705 11.1958 9.57538 11.5875C9.18371 11.9792 8.98788 12.45 8.98788 13C8.98788 13.55 9.18371 14.0208 9.57538 14.4125C9.96705 14.8042 10.4379 15 10.9879 15ZM8.16288 7H13.7879L10.9629 2.8L8.16288 7Z" fill="currentColor"/></svg>
+          <span class="tab-label">Basket</span>
+        </div>
+        <div class="tab-item">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M3.85 15.1C4.7 14.45 5.65 13.9375 6.7 13.5625C7.75 13.1875 8.85 13 10 13C11.15 13 12.25 13.1875 13.3 13.5625C14.35 13.9375 15.3 14.45 16.15 15.1C16.7333 14.4167 17.1875 13.6417 17.5125 12.775C17.8375 11.9083 18 10.9833 18 10C18 7.78333 17.2208 5.89583 15.6625 4.3375C14.1042 2.77917 12.2167 2 10 2C7.78333 2 5.89583 2.77917 4.3375 4.3375C2.77917 5.89583 2 7.78333 2 10C2 10.9833 2.1625 11.9083 2.4875 12.775C2.8125 13.6417 3.26667 14.4167 3.85 15.1ZM10 11C9.01667 11 8.1875 10.6625 7.5125 9.9875C6.8375 9.3125 6.5 8.48333 6.5 7.5C6.5 6.51667 6.8375 5.6875 7.5125 5.0125C8.1875 4.3375 9.01667 4 10 4C10.9833 4 11.8125 4.3375 12.4875 5.0125C13.1625 5.6875 13.5 6.51667 13.5 7.5C13.5 8.48333 13.1625 9.3125 12.4875 9.9875C11.8125 10.6625 10.9833 11 10 11ZM10 20C8.61667 20 7.31667 19.7375 6.1 19.2125C4.88333 18.6875 3.825 17.975 2.925 17.075C2.025 16.175 1.3125 15.1167 0.7875 13.9C0.2625 12.6833 0 11.3833 0 10C0 8.61667 0.2625 7.31667 0.7875 6.1C1.3125 4.88333 2.025 3.825 2.925 2.925C3.825 2.025 4.88333 1.3125 6.1 0.7875C7.31667 0.2625 8.61667 0 10 0C11.3833 0 12.6833 0.2625 13.9 0.7875C15.1167 1.3125 16.175 2.025 17.075 2.925C17.975 3.825 18.6875 4.88333 19.2125 6.1C19.7375 7.31667 20 8.61667 20 10C20 11.3833 19.7375 12.6833 19.2125 13.9C18.6875 15.1167 17.975 16.175 17.075 17.075C16.175 17.975 15.1167 18.6875 13.9 19.2125C12.6833 19.7375 11.3833 20 10 20ZM10 18C10.8833 18 11.7167 17.8708 12.5 17.6125C13.2833 17.3542 14 16.9833 14.65 16.5C14 16.0167 13.2833 15.6458 12.5 15.3875C11.7167 15.1292 10.8833 15 10 15C9.11667 15 8.28333 15.1292 7.5 15.3875C6.71667 15.6458 6 16.0167 5.35 16.5C6 16.9833 6.71667 17.3542 7.5 17.6125C8.28333 17.8708 9.11667 18 10 18ZM10 9C10.4333 9 10.7917 8.85833 11.075 8.575C11.3583 8.29167 11.5 7.93333 11.5 7.5C11.5 7.06667 11.3583 6.70833 11.075 6.425C10.7917 6.14167 10.4333 6 10 6C9.56667 6 9.20833 6.14167 8.925 6.425C8.64167 6.70833 8.5 7.06667 8.5 7.5C8.5 7.93333 8.64167 8.29167 8.925 8.575C9.20833 8.85833 9.56667 9 10 9Z" fill="currentColor"/></svg>
+          <span class="tab-label">Account</span>
+        </div>
+      </div>
+      <div class="tab-home-bar"></div>
+    </nav>
+
+  </div><!-- /screen-memories -->
+
+
+  <!-- ═══════════════════ SCREEN 3: ALBUM ═══════════════════ -->
+  <div class="screen" id="screen-album">
+
+    <nav class="sub-nav">
+      <button class="sub-nav-back" id="albumBack" aria-label="Back">
+        <svg width="11" height="19" viewBox="0 0 11 19" fill="none"><path d="M9.5 1.5L1.5 9.5L9.5 17.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="sub-nav-title" id="albumTitle">Berlin, Germany</span>
+    </nav>
+
+    <!-- Controls — scrolls sideways so "hidden" stays reachable -->
+    <div class="album-controls">
+      <div class="album-controls-row">
+        <button class="album-ctrl" id="selectAllBtn" onclick="toggleSelectAll()">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M8.83341 11.5L7.04175 9.70832C6.88897 9.55554 6.69453 9.47916 6.45841 9.47916C6.2223 9.47916 6.02786 9.55554 5.87508 9.70832C5.7223 9.8611 5.64591 10.0555 5.64591 10.2917C5.64591 10.5278 5.7223 10.7222 5.87508 10.875L8.25008 13.25C8.41675 13.4167 8.61119 13.5 8.83341 13.5C9.05564 13.5 9.25008 13.4167 9.41675 13.25L14.1251 8.54166C14.2779 8.38888 14.3542 8.19443 14.3542 7.95832C14.3542 7.72221 14.2779 7.52777 14.1251 7.37499C13.9723 7.22221 13.7779 7.14582 13.5417 7.14582C13.3056 7.14582 13.1112 7.22221 12.9584 7.37499L8.83341 11.5ZM10.0001 18.3333C8.8473 18.3333 7.76397 18.1146 6.75008 17.6771C5.73619 17.2396 4.85425 16.6458 4.10425 15.8958C3.35425 15.1458 2.7605 14.2639 2.323 13.25C1.8855 12.2361 1.66675 11.1528 1.66675 9.99999C1.66675 8.84721 1.8855 7.76388 2.323 6.74999C2.7605 5.7361 3.35425 4.85416 4.10425 4.10416C4.85425 3.35416 5.73619 2.76041 6.75008 2.32291C7.76397 1.88541 8.8473 1.66666 10.0001 1.66666C11.1529 1.66666 12.2362 1.88541 13.2501 2.32291C14.264 2.76041 15.1459 3.35416 15.8959 4.10416C16.6459 4.85416 17.2397 5.7361 17.6772 6.74999C18.1147 7.76388 18.3334 8.84721 18.3334 9.99999C18.3334 11.1528 18.1147 12.2361 17.6772 13.25C17.2397 14.2639 16.6459 15.1458 15.8959 15.8958C15.1459 16.6458 14.264 17.2396 13.2501 17.6771C12.2362 18.1146 11.1529 18.3333 10.0001 18.3333ZM10.0001 16.6667C11.8612 16.6667 13.4376 16.0208 14.7292 14.7292C16.0209 13.4375 16.6667 11.8611 16.6667 9.99999C16.6667 8.13888 16.0209 6.56249 14.7292 5.27082C13.4376 3.97916 11.8612 3.33332 10.0001 3.33332C8.13897 3.33332 6.56258 3.97916 5.27091 5.27082C3.97925 6.56249 3.33341 8.13888 3.33341 9.99999C3.33341 11.8611 3.97925 13.4375 5.27091 14.7292C6.56258 16.0208 8.13897 16.6667 10.0001 16.6667Z" fill="currentColor"/></svg>
+          Select all
+        </button>
+        <button class="album-ctrl" id="recommendedBtn" onclick="toggleRecommended()">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10.0001 1.66659C10.4603 1.66659 10.8334 2.03973 10.8334 2.49992C10.8334 2.96016 10.4603 3.33326 10.0001 3.33326C6.31821 3.33326 3.33346 6.31806 3.33341 9.99992C3.33341 13.6818 6.31818 16.6666 10.0001 16.6666C13.682 16.6666 16.6667 13.6818 16.6667 9.99992C16.6668 9.53972 17.0399 9.16659 17.5001 9.16659C17.9603 9.16659 18.3334 9.53973 18.3334 9.99992C18.3334 14.6023 14.6025 18.3333 10.0001 18.3333C5.39771 18.3333 1.66675 14.6023 1.66675 9.99992C1.66679 5.39759 5.39773 1.66659 10.0001 1.66659Z" fill="currentColor"/> <path d="M12.5359 7.9524C12.8613 7.62702 13.3888 7.62702 13.7143 7.9524C14.0397 8.27782 14.0397 8.80534 13.7143 9.13078L9.75594 13.0891C9.4305 13.4146 8.90299 13.4146 8.57756 13.0891L6.49422 11.0058C6.16883 10.6803 6.1688 10.1528 6.49422 9.8274C6.79931 9.52235 7.28183 9.50352 7.60913 9.77043L7.67261 9.8274L9.16675 11.3215L12.5359 7.9524Z" fill="currentColor"/> <path d="M15.5103 1.07659C15.6032 0.752141 16.0636 0.752141 16.1565 1.07659C16.5389 2.41499 17.585 3.46111 18.9234 3.84351C19.248 3.93631 19.248 4.39684 18.9234 4.48967C17.585 4.87207 16.5389 5.91819 16.1565 7.2566C16.0637 7.58125 15.6031 7.58124 15.5103 7.2566C15.1279 5.91819 14.0818 4.87207 12.7434 4.48967C12.4189 4.39684 12.4188 3.93631 12.7434 3.84351C14.0818 3.46111 15.1279 2.41499 15.5103 1.07659Z" fill="currentColor"/></svg>
+          Select Recommended
+        </button>
+        <button class="album-ctrl" id="hiddenBtn" onclick="toggleHidden()">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M12.6459 6.9375C13.0487 7.34028 13.3438 7.79861 13.5313 8.3125C13.7188 8.82639 13.7848 9.35417 13.7292 9.89583C13.7292 10.1042 13.6529 10.2813 13.5001 10.4271C13.3473 10.5729 13.1667 10.6458 12.9584 10.6458C12.7501 10.6458 12.573 10.5729 12.4272 10.4271C12.2813 10.2813 12.2084 10.1042 12.2084 9.89583C12.2779 9.53472 12.257 9.1875 12.1459 8.85417C12.0348 8.52083 11.8612 8.23611 11.6251 8C11.389 7.76389 11.1042 7.58333 10.7709 7.45833C10.4376 7.33333 10.0834 7.30556 9.70841 7.375C9.50008 7.375 9.323 7.29861 9.17716 7.14583C9.03133 6.99306 8.95841 6.8125 8.95841 6.60417C8.95841 6.39583 9.03133 6.21875 9.17716 6.07292C9.323 5.92708 9.50008 5.85417 9.70841 5.85417C10.2362 5.79861 10.757 5.86458 11.2709 6.05208C11.7848 6.23958 12.2431 6.53472 12.6459 6.9375ZM10.0001 5C9.73619 5 9.47925 5.01042 9.22925 5.03125C8.97925 5.05208 8.72925 5.09028 8.47925 5.14583C8.24314 5.1875 8.03133 5.15278 7.84383 5.04167C7.65633 4.93056 7.52786 4.76389 7.45841 4.54167C7.38897 4.31944 7.41328 4.10417 7.53133 3.89583C7.64939 3.6875 7.81953 3.5625 8.04175 3.52083C8.36119 3.45139 8.68411 3.40278 9.0105 3.375C9.33689 3.34722 9.66675 3.33333 10.0001 3.33333C11.9029 3.33333 13.6424 3.83333 15.2188 4.83333C16.7952 5.83333 18.0001 7.18056 18.8334 8.875C18.889 8.98611 18.9306 9.10069 18.9584 9.21875C18.9862 9.33681 19.0001 9.45833 19.0001 9.58333C19.0001 9.70833 18.9897 9.82986 18.9688 9.94792C18.948 10.066 18.9098 10.1806 18.8542 10.2917C18.6042 10.8472 18.2952 11.3681 17.9272 11.8542C17.5591 12.3403 17.1529 12.7847 16.7084 13.1875C16.5417 13.3403 16.3473 13.4028 16.1251 13.375C15.9029 13.3472 15.7223 13.2361 15.5834 13.0417C15.4445 12.8472 15.3855 12.6354 15.4063 12.4063C15.4272 12.1771 15.5209 11.9861 15.6876 11.8333C16.0209 11.5139 16.3265 11.1667 16.6042 10.7917C16.882 10.4167 17.1251 10.0139 17.3334 9.58333C16.639 8.18056 15.6355 7.06597 14.323 6.23958C13.0105 5.41319 11.5695 5 10.0001 5ZM10.0001 15.8333C8.13897 15.8333 6.43758 15.3299 4.89591 14.3229C3.35425 13.316 2.13897 11.9931 1.25008 10.3542C1.18064 10.2431 1.12855 10.1215 1.09383 9.98958C1.05911 9.85764 1.04175 9.72222 1.04175 9.58333C1.04175 9.44444 1.05564 9.3125 1.08341 9.1875C1.11119 9.0625 1.1598 8.9375 1.22925 8.8125C1.50703 8.25694 1.82994 7.72569 2.198 7.21875C2.56605 6.71181 2.98619 6.25 3.45841 5.83333L1.72925 4.08333C1.57647 3.91667 1.50355 3.71875 1.5105 3.48958C1.51744 3.26042 1.5973 3.06944 1.75008 2.91667C1.90286 2.76389 2.0973 2.6875 2.33341 2.6875C2.56953 2.6875 2.76397 2.76389 2.91675 2.91667L17.0834 17.0833C17.2362 17.2361 17.3161 17.4271 17.323 17.6563C17.3299 17.8854 17.2501 18.0833 17.0834 18.25C16.9306 18.4028 16.7362 18.4792 16.5001 18.4792C16.264 18.4792 16.0695 18.4028 15.9167 18.25L13.0001 15.375C12.514 15.5278 12.0209 15.6424 11.5209 15.7188C11.0209 15.7951 10.514 15.8333 10.0001 15.8333ZM4.62508 7C4.2223 7.36111 3.85425 7.75694 3.52091 8.1875C3.18758 8.61806 2.90286 9.08333 2.66675 9.58333C3.36119 10.9861 4.36466 12.1007 5.67716 12.9271C6.98966 13.7535 8.43064 14.1667 10.0001 14.1667C10.2779 14.1667 10.5487 14.1493 10.8126 14.1146C11.0765 14.0799 11.3473 14.0417 11.6251 14L10.8751 13.2083C10.7223 13.25 10.5765 13.2813 10.4376 13.3021C10.2987 13.3229 10.1529 13.3333 10.0001 13.3333C8.95841 13.3333 8.073 12.9688 7.34383 12.2396C6.61466 11.5104 6.25008 10.625 6.25008 9.58333C6.25008 9.43056 6.2605 9.28472 6.28133 9.14583C6.30216 9.00694 6.33341 8.86111 6.37508 8.70833L4.62508 7Z" fill="currentColor"/></svg>
+          <span><span id="hiddenCountText">21</span> hidden</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="album-scroll" id="albumScroll">
+
+      <!-- Photo chapters -->
+      <div id="photoChapters"></div>
+
+    </div><!-- /album-scroll -->
+
+    <!-- Bottom CTA -->
+    <div class="bottom-cta hidden" id="bottomCta">
+      <div class="cta-btn" onclick="navigate('format')">
+        <span class="cta-btn-text">Next: Choose photo book</span>
+        <span class="cta-btn-count" id="selectedCount">0</span>
+      </div>
+    </div>
+
+    <!-- Strictness menu for "Select Recommended" (iOS-style drop menu) -->
+    <div class="rec-menu-backdrop" id="recMenuBackdrop"></div>
+    <div class="rec-menu" id="recMenu" role="menu" aria-label="How strict should the selection be">
+      <div class="rec-menu-caption">How strict?</div>
+      <div id="recMenuItems"><!-- Populated by JS with live counts --></div>
+    </div>
+
+  </div><!-- /screen-album -->
+
+  <!-- ═══════════════════ SCREEN 4: FORMAT SELECTION ═══════════════════ -->
+  <div class="screen" id="screen-format">
+    <nav class="sub-nav">
+      <button class="sub-nav-back" id="formatBack" aria-label="Back">
+        <svg width="11" height="19" viewBox="0 0 11 19" fill="none"><path d="M9.5 1.5L1.5 9.5L9.5 17.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="sub-nav-title">Choose photo book</span>
+    </nav>
+    <div class="format-scroll">
+      <div class="format-card" onclick="navigate('type')">
+        <img class="format-card-img" src="assets/photo-book%20landscape.jpg" alt="Photo Books - Landscape">
+        <div class="format-card-info">
+          <div class="format-card-name">Photo Books — Landscape</div>
+          <div class="format-card-sale">Up to 60% Off</div>
+        </div>
+      </div>
+      <div class="format-card" onclick="navigate('type')">
+        <img class="format-card-img" src="assets/photo-book%20square.jpg" alt="Photo Books - Square">
+        <div class="format-card-info">
+          <div class="format-card-name">Photo Books — Square</div>
+          <div class="format-card-sale">Up to 60% Off</div>
+        </div>
+      </div>
+      <div class="format-card" onclick="navigate('type')">
+        <img class="format-card-img" src="assets/photo-book%20portrait.jpg" alt="Photo Books - Portrait">
+        <div class="format-card-info">
+          <div class="format-card-name">Photo Books — Portrait</div>
+          <div class="format-card-sale">Up to 60% Off</div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /screen-format -->
+
+  <!-- ═══════════════════ SCREEN 5: TYPE SELECTION ═══════════════════ -->
+  <div class="screen" id="screen-type">
+    <nav class="sub-nav">
+      <button class="sub-nav-back" id="typeBack" aria-label="Back">
+        <svg width="11" height="19" viewBox="0 0 11 19" fill="none"><path d="M9.5 1.5L1.5 9.5L9.5 17.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="sub-nav-title">Photo Books — Landscape</span>
+    </nav>
+    <div class="type-scroll">
+      <div class="type-card" onclick="navigate('pdp')">
+        <img class="type-card-img" src="assets/photo-book%20landscape.jpg" alt="Large Landscape Hardcover">
+        <div class="type-card-info">
+          <div class="type-card-name">Large Landscape Hardcover</div>
+          <div class="type-card-price">From <strong>£43.99</strong></div>
+        </div>
+        <svg class="type-card-chevron" width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1L7 7L1 13" stroke="#C7C7CC" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="type-card" onclick="navigate('pdp')">
+        <img class="type-card-img" src="assets/photo-book%20landscape.jpg" alt="Large Landscape Hardcover Layflat">
+        <div class="type-card-info">
+          <div class="type-card-name">Large Landscape Hardcover Layflat</div>
+          <div class="type-card-price">From <strong>£57.19</strong></div>
+        </div>
+        <svg class="type-card-chevron" width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1L7 7L1 13" stroke="#C7C7CC" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="type-card" onclick="navigate('pdp')">
+        <img class="type-card-img" src="assets/photo-book%20landscape.jpg" alt="Standard Landscape Softcover">
+        <div class="type-card-info">
+          <div class="type-card-name">Standard Landscape Softcover</div>
+          <div class="type-card-price">From <strong>£29.99</strong></div>
+        </div>
+        <svg class="type-card-chevron" width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1L7 7L1 13" stroke="#C7C7CC" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="type-card" onclick="navigate('pdp')">
+        <img class="type-card-img" src="assets/photo-book%20landscape.jpg" alt="Classic Landscape Hardcover">
+        <div class="type-card-info">
+          <div class="type-card-name">Classic Landscape Hardcover</div>
+          <div class="type-card-price">From <strong>£38.50</strong></div>
+        </div>
+        <svg class="type-card-chevron" width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1L7 7L1 13" stroke="#C7C7CC" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </div><!-- /screen-type -->
+
+  <!-- ═══════════════════ SCREEN 6: PDP ═══════════════════ -->
+  <div class="screen" id="screen-pdp">
+    <div class="pdp-scroll">
+      <div class="pdp-hero">
+        <img src="assets/photo-book%20landscape.jpg" alt="Large Landscape Hardcover">
+        <button class="pdp-hero-back" id="pdpBack" aria-label="Back">
+          <svg width="11" height="19" viewBox="0 0 11 19" fill="none"><path d="M9.5 1.5L1.5 9.5L9.5 17.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <span class="pdp-hero-counter">1 / 5</span>
+      </div>
+      <div class="pdp-body">
+        <div class="pdp-title">Large Landscape Hardcover</div>
+        <div class="pdp-price-row">
+          <span class="pdp-price">From £43.99</span>
+          <span class="pdp-badge">50% off from £35</span>
+        </div>
+        <div class="pdp-desc">Choose our popular photo book format – perfect for any occasion</div>
+        <div class="pdp-divider"></div>
+        <div class="pdp-specs">
+          <div class="pdp-spec">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#888" stroke-width="1.6"/><path d="M3 9h18M9 9v12" stroke="#888" stroke-width="1.6"/></svg>
+            <span class="pdp-spec-label">Size: 28 × 21cm (~A4)</span>
+          </div>
+          <div class="pdp-spec">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="2" width="12" height="20" rx="1.5" stroke="#888" stroke-width="1.6"/><path d="M7 6h6M7 10h6M7 14h4" stroke="#888" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <span class="pdp-spec-label">From 24 to 120 pages</span>
+          </div>
+        </div>
+        <div class="pdp-divider"></div>
+        <div class="pdp-delivery">
+          <svg width="28" height="22" viewBox="0 0 28 22" fill="none" style="flex-shrink:0;margin-top:2px"><rect x="1" y="5" width="18" height="13" rx="1.5" stroke="#888" stroke-width="1.5"/><path d="M19 9h4l3 4v4h-7V9z" stroke="#888" stroke-width="1.5" stroke-linejoin="round"/><circle cx="6" cy="19" r="2.5" stroke="#888" stroke-width="1.5"/><circle cx="22" cy="19" r="2.5" stroke="#888" stroke-width="1.5"/></svg>
+          <div>
+            <div class="pdp-delivery-text">We're experts in delivering high quality photo products</div>
+            <a class="pdp-delivery-link">Delivery Information</a>
+          </div>
+        </div>
+        <div class="pdp-divider"></div>
+        <div class="pdp-feature">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.9 5.8L21 9l-4.5 4.4 1.1 6.6L12 17l-5.6 3 1.1-6.6L3 9l6.1-1.2L12 2z" stroke="#888" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          <span class="pdp-feature-label">Easy to create</span>
+        </div>
+      </div>
+    </div>
+    <div class="pdp-create-wrap">
+      <button class="pdp-create-btn" onclick="navigate('upload')">Create</button>
+    </div>
+  </div><!-- /screen-pdp -->
+
+  <!-- ═══════════════════ SCREEN 7: UPLOAD ═══════════════════ -->
+  <div class="screen" id="screen-upload">
+    <nav class="sub-nav" style="border-bottom:none;">
+      <button class="sub-nav-back" id="uploadBack" aria-label="Back">
+        <svg width="11" height="19" viewBox="0 0 11 19" fill="none"><path d="M9.5 1.5L1.5 9.5L9.5 17.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </nav>
+    <div class="upload-body">
+      <div class="upload-title">Uploading your creation</div>
+      <div class="upload-subtitle">It will take a moment. Please, stay on this screen</div>
+      <div class="upload-progress-bar-wrap">
+        <div class="upload-progress-bar" id="uploadProgressBar"></div>
+      </div>
+      <div class="upload-status-row">
+        <span class="upload-status-text">Uploading Photos...</span>
+        <span class="upload-status-text" id="uploadPct">1%</span>
+      </div>
+    </div>
+    <div class="upload-illustration">
+      <div class="upload-illustration-inner"></div>
+    </div>
+  </div><!-- /screen-upload -->
+
+  <!-- ═══════════════════ SCREEN 8: EDITOR ═══════════════════ -->
+  <div class="screen" id="screen-editor">
+
+    <!-- Header -->
+    <div class="editor-header">
+      <div class="editor-header-left">
+        <div class="editor-hamburger">
+          <svg width="18" height="13" viewBox="0 0 18 13" fill="none">
+            <path d="M0 0.5h18M0 6.5h18M0 12.5h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <span class="editor-header-title">Edit design</span>
+      </div>
+      <div class="editor-header-right">
+        <!-- Cloud saved icon -->
+        <div class="editor-save-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+            <path d="M9.5 16.5l-2.5-2.5 1.06-1.06L9.5 14.38l4.44-4.44L15 11l-5.5 5.5z" fill="var(--accent)"/>
+          </svg>
+        </div>
+        <button class="editor-done-btn" id="editorDoneBtn">Done</button>
+      </div>
+    </div>
+
+    <div class="editor-scroll">
+
+      <!-- Undo / Redo floating toolbar -->
+      <div class="editor-toolbar">
+        <button class="editor-tool-btn" aria-label="Undo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 8c-2.65 0-5.05 1-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+        </button>
+        <button class="editor-tool-btn" aria-label="Redo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.4 10.6C16.55 9 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/></svg>
+        </button>
+      </div>
+
+      <div class="editor-spreads">
+
+        <!-- ── Spread 1: Cover ── -->
+        <div class="spread-group">
+          <div class="spread-card">
+            <!-- Back cover (empty) -->
+            <div class="spread-page"></div>
+            <!-- Front cover -->
+            <div class="spread-page cover-front">
+              <img class="spread-page-photo" src="images/berlin/finally-in-berlin_55216667916_o.jpg" alt="Cover photo">
+              <div class="spread-cover-title">Your book title</div>
+            </div>
+            <!-- Spine -->
+            <div class="spread-spine">
+              <span class="spread-spine-text">Your book title</span>
+            </div>
+          </div>
+          <div class="spread-labels">
+            <span class="spread-lbl-center">Cover</span>
+          </div>
+        </div>
+
+        <!-- ── Spread 2: Inside cover / Page 1 ── -->
+        <div class="spread-group">
+          <div class="spread-card">
+            <!-- Flyleaf (empty white) -->
+            <div class="spread-page"></div>
+            <!-- Page 1 with photo -->
+            <div class="spread-page">
+              <img class="spread-page-photo" src="images/berlin/berlin_55217741268_o.jpg" alt="Page 1">
+            </div>
+            <div class="spread-spine"></div>
+          </div>
+          <div class="spread-labels">
+            <span class="spread-lbl">Inside cover</span>
+            <span class="spread-lbl">1</span>
+          </div>
+        </div>
+
+        <!-- ── Spread 3: Pages 2 / 3 ── -->
+        <div class="spread-group">
+          <div class="spread-card">
+            <div class="spread-page">
+              <img class="spread-page-photo" src="images/berlin/at-the-albertinum-museum_55213340538_o.jpg" alt="Page 2">
+            </div>
+            <div class="spread-page">
+              <img class="spread-page-photo" src="images/berlin/der-zwinger-dresden_55209218347_o.jpg" alt="Page 3">
+            </div>
+            <div class="spread-spine"></div>
+          </div>
+          <div class="spread-labels">
+            <span class="spread-lbl">2</span>
+            <span class="spread-lbl">3</span>
+          </div>
+        </div>
+
+        <!-- ── Spread 4: Pages 4 / 5 ── -->
+        <div class="spread-group">
+          <div class="spread-card">
+            <div class="spread-page">
+              <img class="spread-page-photo" src="images/berlin/out-on-the-town-this-morning_55212825378_o.jpg" alt="Page 4">
+            </div>
+            <div class="spread-page">
+              <img class="spread-page-photo" src="images/berlin/berlin_55218834613_o.jpg" alt="Page 5">
+            </div>
+            <div class="spread-spine"></div>
+          </div>
+          <div class="spread-labels">
+            <span class="spread-lbl">4</span>
+            <span class="spread-lbl">5</span>
+          </div>
+        </div>
+
+        <!-- ── Spread 5: Page 6 / Inside back cover ── -->
+        <div class="spread-group">
+          <div class="spread-card">
+            <div class="spread-page">
+              <img class="spread-page-photo" src="images/berlin/berlin_55219070835_o.jpg" alt="Page 6">
+            </div>
+            <!-- Inside back cover (flyleaf, always white) -->
+            <div class="spread-page"></div>
+            <div class="spread-spine"></div>
+          </div>
+          <div class="spread-labels">
+            <span class="spread-lbl">6</span>
+            <span class="spread-lbl">Inside back</span>
+          </div>
+        </div>
+
+      </div><!-- /editor-spreads -->
+    </div><!-- /editor-scroll -->
+
+  </div><!-- /screen-editor -->
+
+  <!-- ═══════════════════ HIDDEN PHOTOS SHEET ═══════════════════ -->
+  <div class="hidden-sheet-overlay" id="hiddenSheetOverlay"></div>
+  <div class="hidden-sheet" id="hiddenSheet">
+    <button class="hidden-sheet-close" id="hiddenSheetClose" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M1 1L13 13M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <div class="hidden-sheet-header">
+      <div class="hidden-sheet-icon-group">
+        <svg class="hidden-sheet-icon" viewBox="0 0 24 24" fill="none">
+          <path d="M3 3l18 18M10.584 10.587A2 2 0 0013.42 13.4M7.362 7.36C5.68 8.44 4.22 9.86 3 12c1.73 2.86 4.26 5 9 5a9.58 9.58 0 003.62-.71M9.773 4.76A9.144 9.144 0 0112 4.5c4.74 0 7.27 2.14 9 5-1.02 1.68-2.15 3.02-3.42 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="hidden-sheet-title">Hidden photos</div>
+      </div>
+      <div class="hidden-sheet-desc">We hide photos with low-quality, duplicates, bills and screenshots to keep your stories clean. Select a photo to unhide it.</div>
+    </div>
+    <div class="hidden-sheet-scroll">
+      <div class="hidden-sheet-grid" id="hiddenSheetGrid"></div>
+    </div>
+    <div class="hidden-sheet-cta" id="hiddenSheetCta">
+      <button class="unhide-btn" id="unhideBtn">Unhide</button>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+'use strict';
+
+/* ─────────────────────────────────────────
+   PHOTO DATA
+───────────────────────────────────────── */
+const B = 'images/berlin/';
+const H = 'images/hiking/';
+
+/* Hidden photos — sourced from images/berlin/hidden/ */
+const BH = 'images/berlin/hidden/';
+const HIDDEN_PHOTOS = [
+  BH + 'a-dinner-party-in-ossling_55215701166_o.jpg',
+  BH + 'an-extremely-full-flight_55203127296_o.jpg',
+  BH + 'berlin_55217771172_o.jpg',
+  BH + 'the-adventure-begins_55201314168_o.jpg',
+  BH + 'train-itinerary_55200561407_o.jpg',
+];
+
+const CHAPTERS = [
+  /* Travel day — the three single-shot legs (Evansville → Charlotte →
+     Frankfurt) read as one chapter rather than three lonely ones. */
+  {
+    name: 'Bahnhofsviertel, Frankfurt',
+    date: '3 June 2026',
+    photos: [
+      B + 'departing-evv_55203343539_o.jpg',
+      B + 'soon-boarding-in-charlotte_55203345084_o.jpg',
+      B + 'made-it-to-frankfurt-hauptbahnhof-and-got-an-early-train-to-dresden_55203407447_o.jpg',
+    ]
+  },
+  {
+    name: 'Saxony',
+    date: '3 June 2026',
+    photos: [
+      B + 'from-the-train-looking-into-the-saxon-countryside_55205341513_o.jpg',
+      B + 'my-reading-this-trip-will-be-alastair-reynolds-the-revelation-space-collection-which-is-4554-pages_55202895783_o.jpg',
+    ]
+  },
+  {
+    name: 'Rothenburger Straße, Dresden',
+    date: '3 June 2026',
+    photos: [
+      B + 'my-room-at-the-boutique-hotel-rothenburger_55204291957_o.jpg',
+    ]
+  },
+  {
+    name: 'Hauptstraße, Dresden',
+    date: '4 June 2026',
+    photos: [
+      B + 'three-kings-church_55205572564_o.jpg',
+    ]
+  },
+  {
+    name: 'Sophienstraße, Dresden',
+    date: '4 June 2026',
+    photos: [
+      B + 'der-zwinger-dresden_55209218347_o.jpg',
+      B + 'der-zwinger-dresden_55210272298_o.jpg',
+    ]
+  },
+  {
+    name: 'Innere Altstadt, Dresden',
+    date: '4 June 2026',
+    photos: [
+      B + 'schmidt_55205567439_o.jpg',
+      B + 'paco-has-arrived_55207454856_o.jpg',
+    ]
+  },
+  {
+    name: 'Innere Neustadt, Dresden',
+    date: '4 June 2026',
+    photos: [
+      B + 'a-beautiful-morning-and-wonderful-breakfast_55213065380_o.jpg',
+      B + '55213072822_257c18e819_o.jpg',
+      B + '55213072917_c443585f82_o.jpg',
+      B + 'out-on-the-town-this-morning_55212825378_o.jpg',
+    ]
+  },
+  {
+    name: 'Georg-Treu-Platz, Dresden',
+    date: '5 June 2026',
+    photos: [
+      B + 'at-the-albertinum-museum_55213187121_o.jpg',
+      B + 'at-the-albertinum-museum_55213340538_o.jpg',
+      B + 'at-the-albertinum-museum_55213340698_o.jpg',
+      B + 'at-the-albertinum-museum_55213431214_o.jpg',
+      B + 'at-the-albertinum-museum_55213971616_o.jpg',
+      B + 'at-the-albertinum-museum_55214216319_o.jpg',
+      B + 'at-the-albertinum-museum_55214368900_o.jpg',
+      B + '55214127908_bcb3810dc2_o.jpg',
+      B + '55214128598_5a945175b7_o.jpg',
+    ]
+  },
+  {
+    name: 'Europaplatz, Berlin',
+    date: '6 June 2026',
+    photos: [
+      B + 'finally-in-berlin_55217062540_o.jpg',
+    ]
+  },
+  {
+    name: 'Mitte, Berlin',
+    date: '7 June 2026',
+    photos: [
+      B + 'berlin_55217585186_o.jpg',
+      B + 'berlin_55217741268_o.jpg',
+    ]
+  },
+  {
+    name: 'Alexanderplatz, Berlin',
+    date: '7 June 2026',
+    photos: [
+      B + 'berlin_55217839044_o.jpg',
+    ]
+  },
+  {
+    name: 'Friedrichshain, Berlin',
+    date: '8 June 2026',
+    photos: [
+      B + 'berlin_55218676486_o.jpg',
+      B + 'berlin_55218834613_o.jpg',
+      B + 'berlin_55219070835_o.jpg',
+    ]
+  },
+  {
+    name: 'Kreuzberg, Berlin',
+    date: '9 June 2026',
+    photos: [
+      B + 'berlin_55219105418_o.jpg',
+      B + 'berlin_55217774939_o.jpg',
+      B + 'berlin_55217677318_o.jpg',
+    ]
+  },
+  {
+    name: 'Prenzlauer Berg, Berlin',
+    date: '10 June 2026',
+    photos: [
+      B + 'berlin_55223991976_o.jpg',
+      B + 'berlin_55217919560_o.jpg',
+      B + 'berlin_55217838909_o.jpg',
+    ]
+  },
+  {
+    name: 'Charlottenburg, Berlin',
+    date: '11–12 June 2026',
+    photos: [
+      B + 'berlin_55217585856_o.jpg',
+      B + 'berlin_55218930114_o.jpg',
+      B + 'berlin_55216624597_o.jpg',
+      B + 'berlin_55217775159_o.jpg',
+      B + 'berlin_55224400770_o.jpg',
+    ]
+  }
+];
+
+/* ─────────────────────────────────────────
+   ALBUMS — the single shared dataset.
+   Kept byte-identical in v1 and v2 so both prototypes show the same
+   generated content and only the UI differs. Newest trip first;
+   ALBUMS[0] is the album both prototypes open.
+     size 'big'   — a proper trip. v2 features these in the top carousel.
+     size 'short' — a weekend or a day out. v2 puts these in "Short trips".
+   Both variants list the whole array, grouped by year, newest year first.
+───────────────────────────────────────── */
+const U = id => `https://images.unsplash.com/photo-${id}?w=800&q=80`;
+
+const ALBUMS = [
+  { name: 'Berlin, Germany',        year: '2026', date: '3 – 12 June 2026',        month: 'June 2026',      count:  42, size: 'big',   img: B + 'finally-in-berlin_55216667916_o.jpg' },
+  { name: 'Dresden, Germany',       year: '2026', date: '15 – 17 May 2026',        month: 'May 2026',       count:  28, size: 'short', img: B + 'der-zwinger-dresden_55209218347_o.jpg' },
+  { name: 'Rome, Italy',            year: '2026', date: '2 – 8 April 2026',        month: 'April 2026',     count:  74, size: 'big',   img: U('1552832230-c0197dd311b5') },
+  { name: 'Amsterdam, Netherlands', year: '2026', date: '23 – 26 February 2026',   month: 'February 2026',  count:  31, size: 'short', img: U('1512470876302-972faa2aa9a4') },
+
+  { name: 'Santorini, Greece',      year: '2025', date: '30 July – 8 August 2025', month: 'August 2025',    count: 112, size: 'big',   img: U('1570077188670-e3a8d69ac5ff') },
+  { name: 'Yorkshire, England',     year: '2025', date: '12 – 19 July 2025',       month: 'July 2025',      count:  68, size: 'big',   img: H + 'derbyshire-peaks-and-the-yorkshire-dales-july-2025_54675737300_o.jpg' },
+  { name: 'Venice, Italy',          year: '2025', date: '9 – 15 May 2025',         month: 'May 2025',       count:  57, size: 'big',   img: U('1523906834658-6e24ef2386f9') },
+  { name: 'Albertinum, Dresden',    year: '2025', date: '22 – 23 March 2025',      month: 'March 2025',     count:  24, size: 'short', img: B + 'at-the-albertinum-museum_55213340538_o.jpg' },
+  { name: 'Paris, France',          year: '2025', date: '5 – 11 February 2025',    month: 'February 2025',  count:  63, size: 'big',   img: U('1502602898657-3e91760cbb34') },
+
+  { name: 'Vienna, Austria',        year: '2024', date: '12 – 16 December 2024',   month: 'December 2024',  count:  39, size: 'short', img: U('1516550893923-42d28e5677af') },
+  { name: 'Manarola, Italy',        year: '2024', date: '3 – 10 September 2024',   month: 'September 2024', count:  88, size: 'big',   img: U('1516483638261-f4dbaf036963') },
+  { name: 'Peak District, England', year: '2024', date: '5 – 7 July 2024',         month: 'July 2024',      count:  33, size: 'short', img: H + 'derbyshire-peaks-and-yorkshire-dales-july-2025_54675799974_o.jpg' },
+  { name: 'Barcelona, Spain',       year: '2024', date: '18 – 24 March 2024',      month: 'March 2024',     count:  71, size: 'big',   img: U('1523531294919-4bcd7c65e216') },
+
+  { name: 'London, England',        year: '2023', date: '28 – 31 December 2023',   month: 'December 2023',  count:  26, size: 'short', img: U('1533929736458-ca588d08c8be') },
+  { name: 'Positano, Italy',        year: '2023', date: '15 – 23 August 2023',     month: 'August 2023',    count:  94, size: 'big',   img: U('1499678329028-101435549a4e') },
+  { name: 'Prague, Czechia',        year: '2023', date: '11 – 17 April 2023',      month: 'April 2023',     count:  61, size: 'big',   img: U('1519677100203-a0e668c92439') },
+
+  { name: 'Rothenburg, Germany',    year: '2022', date: '2 – 6 November 2022',     month: 'November 2022',  count:  35, size: 'short', img: U('1467269204594-9661b134dd2b') },
+  { name: 'Braies, Italy',          year: '2022', date: '4 – 11 July 2022',        month: 'July 2022',      count:  78, size: 'big',   img: U('1476514525535-07fb3b4ae5f1') },
+  { name: 'Madrid, Spain',          year: '2022', date: '3 – 9 March 2022',        month: 'March 2022',     count:  52, size: 'big',   img: U('1543783207-ec64e4d95325') },
+
+  { name: 'Zakynthos, Greece',      year: '2021', date: '2 – 9 October 2021',      month: 'October 2021',   count:  84, size: 'big',   img: U('1518623489648-a173ef7824f3') },
+  { name: 'Helsinki, Finland',      year: '2021', date: '6 – 12 August 2021',      month: 'August 2021',    count:  47, size: 'big',   img: U('1538332576228-eb5b4c4de6f5') },
+  { name: 'Frankfurt, Germany',     year: '2021', date: '14 – 16 May 2021',        month: 'May 2021',       count:  22, size: 'short', img: B + 'berlin_55217741268_o.jpg' },
+
+  { name: 'Dubai, UAE',             year: '2020', date: '14 – 20 November 2020',   month: 'November 2020',  count:  66, size: 'big',   img: U('1512453979798-5ea266f8880c') },
+  { name: 'Amsterdam, Netherlands', year: '2020', date: '17 – 21 January 2020',    month: 'January 2020',   count:  29, size: 'short', img: U('1534351590666-13e3e96b5017') },
+
+  { name: 'New York, USA',          year: '2019', date: '2 – 11 August 2019',      month: 'August 2019',    count: 121, size: 'big',   img: U('1477959858617-67f85cf4f1df') },
+  { name: 'London, England',        year: '2019', date: '4 – 8 May 2019',          month: 'May 2019',       count:  30, size: 'short', img: U('1490642914619-7955a3fd483c') },
+  { name: 'Paris, France',          year: '2019', date: '22 – 27 March 2019',      month: 'March 2019',     count:  58, size: 'big',   img: U('1499856871958-5b9627545d1a') },
+];
+
+/* Derived views over the same array — no separate content anywhere.
+   ALBUM_YEARS / ALBUMS_BY_YEAR back the year-grouped list in both variants;
+   BIG_TRIPS and SHORT_TRIPS back v2's carousel and "Short trips" strip. */
+const ALBUM_YEARS    = [...new Set(ALBUMS.map(a => a.year))];
+const ALBUMS_BY_YEAR = ALBUM_YEARS.reduce((m, y) => (m[y] = ALBUMS.filter(a => a.year === y), m), {});
+const BIG_TRIPS      = ALBUMS.filter(a => a.size === 'big').slice(0, 6);
+const SHORT_TRIPS    = ALBUMS.filter(a => a.size === 'short').slice(0, 6);
+
+/* Both prototypes open ALBUMS[0] from every album tile. */
+const OPEN_ALBUM = ALBUMS[0];
+
+
+
+/* ─────────────────────────────────────────
+   NAVIGATION
+───────────────────────────────────────── */
+const screens = {
+  home:   document.getElementById('screen-home'),
+  memories: document.getElementById('screen-memories'),
+  album:  document.getElementById('screen-album'),
+  format: document.getElementById('screen-format'),
+  type:   document.getElementById('screen-type'),
+  pdp:    document.getElementById('screen-pdp'),
+  upload: document.getElementById('screen-upload'),
+  editor: document.getElementById('screen-editor'),
+};
+
+let currentStack = ['home'];
+
+function navigate(to) {
+  const from = currentStack[currentStack.length - 1];
+  if (from === to) return;
+
+  // Clear any stale inline styles (left by a previous goBack)
+  const toEl = screens[to];
+  toEl.style.cssText = '';
+
+  screens[from].classList.remove('active', 'base');
+  screens[from].classList.add('behind');
+
+  toEl.classList.remove('behind');
+  toEl.classList.add('active');
+  currentStack.push(to);
+
+  if (to === 'upload') startUploadAnim();
+}
+
+/* Top-level tab switch (Home ↔ Memories): instant swap, no push/back slide,
+   resets the nav stack so sub-pages open on top of the tab. */
+const TAB_SCREENS = ['home', 'memories'];
+function switchTab(to) {
+  if (!TAB_SCREENS.includes(to)) return;
+  const from = currentStack[currentStack.length - 1];
+  if (from === to) return;
+
+  const a = screens[from], b = screens[to];
+  a.style.transition = 'none';
+  b.style.transition = 'none';
+
+  a.classList.remove('active', 'base', 'behind');
+  a.style.transform = 'translateX(100%)';   // park off-screen, hidden
+
+  b.style.cssText = '';                      // clear any stale inline styles
+  b.style.transition = 'none';
+  b.classList.remove('active', 'behind');
+  b.classList.add('base');                   // resting on-screen, like home
+
+  void b.offsetWidth;                        // reflow so the jump isn't animated
+  requestAnimationFrame(() => { a.style.transition = ''; b.style.transition = ''; });
+
+  currentStack = [to];
+}
+
+function goBack() {
+  if (currentStack.length <= 1) return;
+  const current = currentStack.pop();
+  const prev = currentStack[currentStack.length - 1];
+
+  // Remove .active → CSS default translateX(100%) with transition slides it off right
+  screens[current].classList.remove('active', 'base');
+
+  screens[prev].classList.remove('behind');
+  screens[prev].classList.add('base');
+}
+
+/* Upload progress animation */
+let _uploadAnim = null;
+function startUploadAnim() {
+  clearInterval(_uploadAnim);
+  const bar = document.getElementById('uploadProgressBar');
+  const pct = document.getElementById('uploadPct');
+  if (!bar || !pct) return;
+  let p = 0;
+  bar.style.width = '0%';
+  pct.textContent = '0%';
+  _uploadAnim = setInterval(() => {
+    p += Math.random() * 3 + 0.5;
+    if (p >= 100) {
+      p = 100; clearInterval(_uploadAnim);
+      setTimeout(() => navigate('editor'), 600);
+    }
+    bar.style.width = p.toFixed(1) + '%';
+    pct.textContent = Math.round(p) + '%';
+  }, 80);
+}
+
+/* Wiring */
+const memBanner = document.getElementById('memBanner');
+memBanner.addEventListener('click', () => switchTab('memories'));
+memBanner.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab('memories'); }
+});
+document.getElementById('albumBack').addEventListener('click', () => {
+  exitSelectMode();
+  goBack();
+});
+document.getElementById('formatBack').addEventListener('click', goBack);
+document.getElementById('typeBack').addEventListener('click', goBack);
+document.getElementById('pdpBack').addEventListener('click', goBack);
+document.getElementById('uploadBack').addEventListener('click', goBack);
+document.getElementById('editorDoneBtn').addEventListener('click', () => {
+  // End of creation flow — return to home
+  currentStack = ['home'];
+  Object.values(screens).forEach(s => s.classList.remove('active', 'behind'));
+  screens.home.classList.add('base');
+});
+
+window.openAlbum = function() {
+  resetAlbumScroll();
+  navigate('album');
+};
+
+/* Browser back button */
+window.addEventListener('popstate', goBack);
+
+/* ─────────────────────────────────────────
+   MEMORIES — all trips, grouped by year
+   The year row is a jump bar, not a filter: tapping a chip scrolls to that
+   year, and scrolling marks the year currently in view.
+───────────────────────────────────────── */
+const memScroll = document.getElementById('memScroll');
+const memAlbums = document.getElementById('memAlbums');
+const memYearChips = document.getElementById('memYearChips');
+/* ALBUMS is already newest-first, so ALBUM_YEARS comes out newest-first too. */
+const MEM_YEARS = ALBUM_YEARS;
+
+function renderMemories() {
+  memYearChips.innerHTML = MEM_YEARS.map((y, i) => `
+    <button class="mem-year-chip${i === 0 ? ' active' : ''}" data-year="${y}" onclick="jumpToYear('${y}')">${y}</button>
+  `).join('');
+
+  memAlbums.innerHTML = MEM_YEARS.map(y => `
+    <section class="mem-year-block" data-year="${y}">
+      <div class="mem-year-heading">${y}</div>
+      <div class="mem-album-list">
+        ${ALBUMS_BY_YEAR[y].map(t => `
+          <div class="mem-album-card" onclick="openAlbum()">
+            <img src="${t.img}" alt="${t.name}" loading="lazy">
+            <div class="mem-album-card-overlay">
+              <div class="mem-album-name">${t.name}</div>
+              <div class="mem-album-date">${t.date}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </section>
+  `).join('');
+}
+
+function setActiveYear(year) {
+  let active = null;
+  memYearChips.querySelectorAll('.mem-year-chip').forEach(c => {
+    const on = c.dataset.year === year;
+    c.classList.toggle('active', on);
+    if (on) active = c;
+  });
+  if (!active) return;
+  // Keep the active chip in view without touching the vertical scroll
+  const target = active.offsetLeft - (memYearChips.parentElement.clientWidth - active.offsetWidth) / 2;
+  memYearChips.parentElement.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+}
+
+/* Ignore scroll-spy while a jump animation is running, so the tapped year
+   stays highlighted instead of flickering through the years in between. */
+let _memJumpLock = 0;
+
+window.jumpToYear = function(year) {
+  const block = memAlbums.querySelector(`.mem-year-block[data-year="${year}"]`);
+  if (!block) return;
+  _memJumpLock = 1;
+  setActiveYear(year);
+  memScroll.scrollTo({ top: block.offsetTop - 8, behavior: 'smooth' });
+  clearTimeout(window._memJumpTimer);
+  window._memJumpTimer = setTimeout(() => { _memJumpLock = 0; }, 700);
+};
+
+function updateYearFromScroll() {
+  if (_memJumpLock) return;
+  const blocks = [...memAlbums.querySelectorAll('.mem-year-block')];
+  const line = memScroll.scrollTop + 24;          // just under the jump bar
+  let current = blocks[0];
+  for (const b of blocks) {
+    if (b.offsetTop <= line) current = b;
+  }
+  // At the very bottom the last year wins, even if its heading is off-screen
+  if (memScroll.scrollTop + memScroll.clientHeight >= memScroll.scrollHeight - 2) {
+    current = blocks[blocks.length - 1];
+  }
+  if (current) setActiveYear(current.dataset.year);
+}
+
+renderMemories();
+memScroll.addEventListener('scroll', updateYearFromScroll, { passive: true });
+
+/* Home banner marquee — the six newest covers, twice, for a seamless loop */
+function renderBannerTiles() {
+  const set = ALBUMS.slice(0, 6).map(a => `
+    <div class="mem-banner-tile"><img src="${a.img}" alt="" decoding="async"></div>
+  `).join('');
+  document.getElementById('memBannerTrack').innerHTML = set + set;
+}
+renderBannerTiles();
+
+/* The album screen always opens ALBUMS[0] in the prototype */
+document.getElementById('albumTitle').textContent = OPEN_ALBUM.name;
+
+/* ─────────────────────────────────────────
+   ALBUM — render chapters
+───────────────────────────────────────── */
+const CHECKSVG = `<svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4.5L4.5 8L11 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const SELECTSVG = `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#c7c7cc"/><path d="M7.5 12.2L10.5 15L16.5 8.8" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function buildPhotoChapters() {
+  const container = document.getElementById('photoChapters');
+  container.innerHTML = CHAPTERS.map((ch, ci) => `
+    <div class="chapter-section" data-chapter="${ci}">
+      <div class="chapter-header">
+        <div class="chapter-info">
+          <div class="chapter-name">Chapter ${ci + 1}</div>
+          <div class="chapter-date">${ch.date}</div>
+        </div>
+        <div class="chapter-select" data-chapter="${ci}" onclick="selectChapter(${ci})">
+          ${SELECTSVG} Select
+        </div>
+      </div>
+      <div class="photo-grid">
+        ${ch.photos.map((src, pi) => `
+          <div class="photo-cell" data-chapter="${ci}" data-photo="${pi}" onclick="togglePhoto(this)">
+            <img src="${src}" alt="" loading="lazy">
+            <div class="photo-check">${CHECKSVG}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+buildPhotoChapters();
+
+/* ─────────────────────────────────────────
+   ALBUM — selection mode
+───────────────────────────────────────── */
+let selectedPhotos = new Set();
+
+function isSelecting() { return selectedPhotos.size > 0 || document.getElementById('selectAllBtn').classList.contains('active'); }
+
+function updateCTA() {
+  const cta = document.getElementById('bottomCta');
+  const count = selectedPhotos.size;
+  document.getElementById('selectedCount').textContent = count;
+  if (count > 0) {
+    cta.classList.remove('hidden');
+  } else {
+    cta.classList.add('hidden');
+  }
+}
+
+window.togglePhoto = function(cell) {
+  const key = cell.dataset.chapter + '-' + cell.dataset.photo;
+  if (selectedPhotos.has(key)) {
+    selectedPhotos.delete(key);
+    cell.classList.remove('selected');
+  } else {
+    selectedPhotos.add(key);
+    cell.classList.add('selected');
+  }
+  document.getElementById('selectAllBtn').classList.remove('active');
+  document.getElementById('recommendedBtn').classList.remove('active');
+  syncChapterPills();
+  updateCTA();
+};
+
+window.selectChapter = function(ci) {
+  const cells = [...document.querySelectorAll(`.photo-cell[data-chapter="${ci}"]`)];
+  const allOn = cells.every(c => c.classList.contains('selected'));
+  cells.forEach(cell => {
+    const key = cell.dataset.chapter + '-' + cell.dataset.photo;
+    if (allOn) { selectedPhotos.delete(key); cell.classList.remove('selected'); }
+    else       { selectedPhotos.add(key);    cell.classList.add('selected'); }
+  });
+  document.getElementById('selectAllBtn').classList.remove('active');
+  document.getElementById('recommendedBtn').classList.remove('active');
+  syncChapterPills();
+  updateCTA();
+};
+
+/* A chapter's pill lights up once every photo in it is selected */
+function syncChapterPills() {
+  document.querySelectorAll('.chapter-select').forEach(pill => {
+    const cells = [...document.querySelectorAll(`.photo-cell[data-chapter="${pill.dataset.chapter}"]`)];
+    pill.classList.toggle('active', cells.length > 0 && cells.every(c => c.classList.contains('selected')));
+  });
+}
+
+/* "Recommended" comes in three strengths. Each is a deterministic rule over
+   (chapter, photo) indices, so the prototype picks the same shots every time:
+     strict   — the opener of every other chapter (a tight highlight reel)
+     balanced — one opener per chapter (every chapter represented)
+     light    — openers plus a scattered few extras                        */
+const REC_LEVELS = [
+  { id: 'strict',   label: 'Strict',   match: (ci, pi) => pi === 0 && ci % 2 === 0 },
+  { id: 'balanced', label: 'Balanced', match: (ci, pi) => pi === 0 },
+  { id: 'light',    label: 'Light',    match: (ci, pi) => pi === 0 || (ci + pi) % 3 === 0 },
+];
+let recLevel = null;
+
+function countMatching(match) {
+  return CHAPTERS.reduce((n, ch, ci) =>
+    n + ch.photos.filter((_, pi) => match(ci, pi)).length, 0);
+}
+
+function applySelection(match) {
+  document.querySelectorAll('.photo-cell').forEach(cell => {
+    const ci = Number(cell.dataset.chapter), pi = Number(cell.dataset.photo);
+    const key = ci + '-' + pi;
+    if (match(ci, pi)) { selectedPhotos.add(key); cell.classList.add('selected'); }
+    else               { selectedPhotos.delete(key); cell.classList.remove('selected'); }
+  });
+  syncChapterPills();
+  updateCTA();
+}
+
+window.toggleSelectAll = function() {
+  const on = !document.getElementById('selectAllBtn').classList.contains('active');
+  exitSelectMode();
+  if (on) {
+    document.getElementById('selectAllBtn').classList.add('active');
+    applySelection(() => true);
+  }
+};
+
+/* Tapping the pill opens the strictness menu rather than selecting straight
+   away; the menu's "Unselect" row clears whatever level is applied. */
+const recMenu = document.getElementById('recMenu');
+const recMenuBackdrop = document.getElementById('recMenuBackdrop');
+
+const RECCHECKSVG = `<svg class="rec-menu-check" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 8.5L6 12.5L14 3.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const RECCLEARSVG = `<svg class="rec-menu-clear-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.6"/><path d="M5.6 5.6L10.4 10.4M10.4 5.6L5.6 10.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+
+function buildRecMenu() {
+  const levels = REC_LEVELS.map(l => `
+    <button class="rec-menu-item${recLevel === l.id ? ' active' : ''}" role="menuitemradio"
+            aria-checked="${recLevel === l.id}" onclick="pickRecommended('${l.id}')">
+      ${RECCHECKSVG}
+      <span class="rec-menu-label">${l.label}</span>
+      <span class="rec-menu-count">${countMatching(l.match)}</span>
+    </button>
+  `).join('');
+  /* Only worth offering once there is something to clear */
+  const clear = recLevel === null ? '' : `
+    <button class="rec-menu-item rec-menu-clear" role="menuitem" onclick="clearRecommended()">
+      ${RECCLEARSVG}
+      <span class="rec-menu-label">Unselect</span>
+    </button>
+  `;
+  document.getElementById('recMenuItems').innerHTML = levels + clear;
+}
+
+function openRecMenu() {
+  buildRecMenu();
+  recMenu.style.visibility = 'hidden';
+  recMenu.classList.add('open');           // measure at full size, then place
+  const btn = document.getElementById('recommendedBtn').getBoundingClientRect();
+  const screenRect = document.getElementById('screen-album').getBoundingClientRect();
+  const left = Math.min(
+    Math.max(12, btn.left - screenRect.left),
+    screenRect.width - recMenu.offsetWidth - 12
+  );
+  recMenu.style.top = (btn.bottom - screenRect.top + 6) + 'px';
+  recMenu.style.left = left + 'px';
+  recMenu.style.visibility = '';
+  recMenuBackdrop.classList.add('open');
+}
+
+function closeRecMenu() {
+  recMenu.classList.remove('open');
+  recMenuBackdrop.classList.remove('open');
+}
+
+window.toggleRecommended = function() {
+  if (recMenu.classList.contains('open')) closeRecMenu();
+  else openRecMenu();
+};
+
+window.pickRecommended = function(id) {
+  const level = REC_LEVELS.find(l => l.id === id);
+  exitSelectMode();                         // also resets recLevel
+  recLevel = id;
+  document.getElementById('recommendedBtn').classList.add('active');
+  applySelection(level.match);
+  closeRecMenu();
+};
+
+window.clearRecommended = function() {
+  exitSelectMode();
+  closeRecMenu();
+};
+
+recMenuBackdrop.addEventListener('click', closeRecMenu);
+/* The menu is anchored to the pill, so dismiss it if anything scrolls away */
+document.getElementById('albumScroll').addEventListener('scroll', closeRecMenu, { passive: true });
+document.querySelector('.album-controls').addEventListener('scroll', closeRecMenu, { passive: true });
+
+function exitSelectMode() {
+  selectedPhotos.clear();
+  recLevel = null;
+  document.querySelectorAll('.photo-cell').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.chapter-select').forEach(p => p.classList.remove('active'));
+  document.getElementById('selectAllBtn').classList.remove('active');
+  document.getElementById('recommendedBtn').classList.remove('active');
+  document.getElementById('bottomCta').classList.add('hidden');
+}
+
+/* ─────────────────────────────────────────
+   HIDDEN PHOTOS SHEET
+───────────────────────────────────────── */
+let hiddenSelected = new Set();
+
+const HIDDEN_CHECKSVG = `<svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4.5L4.5 8L11 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function buildHiddenGrid() {
+  const grid = document.getElementById('hiddenSheetGrid');
+  grid.innerHTML = HIDDEN_PHOTOS.map((src, i) => `
+    <div class="hidden-photo-cell" data-hidden="${i}" onclick="toggleHiddenPhoto(this)">
+      <img src="${src}" alt="" loading="lazy">
+      <div class="hidden-photo-check">${HIDDEN_CHECKSVG}</div>
+    </div>
+  `).join('');
+}
+
+window.toggleHiddenPhoto = function(cell) {
+  const key = cell.dataset.hidden;
+  if (hiddenSelected.has(key)) {
+    hiddenSelected.delete(key);
+    cell.classList.remove('selected');
+  } else {
+    hiddenSelected.add(key);
+    cell.classList.add('selected');
+  }
+  updateHiddenCTA();
+};
+
+function updateHiddenCTA() {
+  const cta = document.getElementById('hiddenSheetCta');
+  const btn = document.getElementById('unhideBtn');
+  const n = hiddenSelected.size;
+  if (n > 0) {
+    cta.classList.add('visible');
+    btn.textContent = n === 1 ? 'Unhide 1 photo' : `Unhide ${n} photos`;
+  } else {
+    cta.classList.remove('visible');
+  }
+}
+
+function openHiddenSheet() {
+  document.getElementById('hiddenSheetOverlay').classList.add('open');
+  document.getElementById('hiddenSheet').classList.add('open');
+}
+
+function closeHiddenSheet() {
+  document.getElementById('hiddenSheetOverlay').classList.remove('open');
+  document.getElementById('hiddenSheet').classList.remove('open');
+  hiddenSelected.clear();
+  document.querySelectorAll('.hidden-photo-cell').forEach(c => c.classList.remove('selected'));
+  updateHiddenCTA();
+}
+
+window.toggleHidden = function() {
+  openHiddenSheet();
+};
+
+/* Wire up close button and backdrop tap */
+document.getElementById('hiddenSheetClose').addEventListener('click', closeHiddenSheet);
+document.getElementById('hiddenSheetOverlay').addEventListener('click', closeHiddenSheet);
+
+/* Sync the button label with actual count */
+document.getElementById('hiddenCountText').textContent = HIDDEN_PHOTOS.length;
+
+buildHiddenGrid();
+
+/* ─────────────────────────────────────────
+   ALBUM — reset on open
+───────────────────────────────────────── */
+const albumScroll = document.getElementById('albumScroll');
+
+function resetAlbumScroll() {
+  albumScroll.scrollTop = 0;
+  document.querySelector('.album-controls').scrollLeft = 0;
+  closeRecMenu();
+  exitSelectMode();
+}
+
+/* ─────────────────────────────────────────
+   iOS: suppress long-press context menu
+───────────────────────────────────────── */
+document.addEventListener('contextmenu', e => {
+  if (e.target.closest('.photo-cell, .mem-album-card, .mem-banner')) {
+    e.preventDefault();
+  }
+});
+
+</script>
+</body>
+</html>
